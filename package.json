@@ -6,16 +6,25 @@
   "bin": {
     "effect-prisma-generator": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/m9tdev/effect-prisma-generator.git"
   },
   "keywords": [
     "prisma",
     "generator",
     "effect"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "m9tdev",
+  "license": "MIT",
   "dependencies": {
     "@prisma/generator-helper": "^6.19.0",
     "typescript": "^5.9.3"
