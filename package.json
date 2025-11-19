@@ -1,0 +1,27 @@
+{
+  "name": "effect-prisma-generator",
+  "version": "0.1.0",
+  "description": "Prisma generator for Effect",
+  "main": "dist/index.js",
+  "bin": {
+    "effect-prisma-generator": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "prisma",
+    "generator",
+    "effect"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/generator-helper": "^6.19.0",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@prisma/client": "6.19.0",
+    "@types/node": "^24.10.1"
+  }
+}
