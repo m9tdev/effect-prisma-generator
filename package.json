@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "build": "tsc && chmod +x dist/index.js",
-    "test": "npm run build && prisma generate --schema=tests/schema.prisma && prisma db push --schema=tests/schema.prisma && vitest run",
+    "test": "npm run build && prisma generate --schema=tests/schema.prisma && prisma db push --schema=tests/schema.prisma && tsc --noEmit --project tsconfig.test.json && vitest run",
     "prepublishOnly": "npm run build"
   },
   "repository": {
