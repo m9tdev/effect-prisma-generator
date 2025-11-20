@@ -48,12 +48,7 @@ function generateRawSqlOperations() {
       Effect.flatMap(PrismaClientService, ({ tx: client }) =>
         Effect.tryPromise({
           try: () => (Array.isArray(args) ? client.$executeRaw(args[0], ...args.slice(1)) : client.$executeRaw(args)),
-          catch: (error) =>
-            new PrismaError({
-              error,
-              operation: "$executeRaw",
-              model: "Prisma"
-            })
+          catch: (error) => mapError(error, "$executeRaw", "Prisma")
         })
       ),
 
@@ -61,12 +56,7 @@ function generateRawSqlOperations() {
       Effect.flatMap(PrismaClientService, ({ tx: client }) =>
         Effect.tryPromise({
           try: () => client.$executeRawUnsafe(query, ...values),
-          catch: (error) =>
-            new PrismaError({
-              error,
-              operation: "$executeRawUnsafe",
-              model: "Prisma"
-            })
+          catch: (error) => mapError(error, "$executeRawUnsafe", "Prisma")
         })
       ),
 
@@ -74,12 +64,7 @@ function generateRawSqlOperations() {
       Effect.flatMap(PrismaClientService, ({ tx: client }) =>
         Effect.tryPromise({
           try: () => (Array.isArray(args) ? client.$queryRaw(args[0], ...args.slice(1)) : client.$queryRaw(args)),
-          catch: (error) =>
-            new PrismaError({
-              error,
-              operation: "$queryRaw",
-              model: "Prisma"
-            })
+          catch: (error) => mapError(error, "$queryRaw", "Prisma")
         })
       ),
 
@@ -87,12 +72,7 @@ function generateRawSqlOperations() {
       Effect.flatMap(PrismaClientService, ({ tx: client }) =>
         Effect.tryPromise({
           try: () => client.$queryRawUnsafe(query, ...values),
-          catch: (error) =>
-            new PrismaError({
-              error,
-              operation: "$queryRawUnsafe",
-              model: "Prisma"
-            })
+          catch: (error) => mapError(error, "$queryRawUnsafe", "Prisma")
         })
       ),`;
 }
@@ -108,12 +88,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.findUnique(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "findUnique",
-                model: "${modelName}"
-              })
+            catch: (error) => mapFindError(error, "findUnique", "${modelName}")
           })
         ),
 
@@ -121,12 +96,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.findUniqueOrThrow(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "findUniqueOrThrow",
-                model: "${modelName}"
-              })
+            catch: (error) => mapFindOrThrowError(error, "findUniqueOrThrow", "${modelName}")
           })
         ),
 
@@ -134,12 +104,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.findFirst(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "findFirst",
-                model: "${modelName}"
-              })
+            catch: (error) => mapFindError(error, "findFirst", "${modelName}")
           })
         ),
 
@@ -147,12 +112,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.findFirstOrThrow(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "findFirstOrThrow",
-                model: "${modelName}"
-              })
+            catch: (error) => mapFindOrThrowError(error, "findFirstOrThrow", "${modelName}")
           })
         ),
 
@@ -160,12 +120,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.findMany(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "findMany",
-                model: "${modelName}"
-              })
+            catch: (error) => mapFindError(error, "findMany", "${modelName}")
           })
         ),
 
@@ -173,12 +128,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.create(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "create",
-                model: "${modelName}"
-              })
+            catch: (error) => mapCreateError(error, "create", "${modelName}")
           })
         ),
 
@@ -186,12 +136,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.createMany(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "createMany",
-                model: "${modelName}"
-              })
+            catch: (error) => mapCreateError(error, "createMany", "${modelName}")
           })
         ),
 
@@ -199,12 +144,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.createManyAndReturn(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "createManyAndReturn",
-                model: "${modelName}"
-              })
+            catch: (error) => mapCreateError(error, "createManyAndReturn", "${modelName}")
           })
         ),
 
@@ -212,12 +152,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.delete(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "delete",
-                model: "${modelName}"
-              })
+            catch: (error) => mapDeleteError(error, "delete", "${modelName}")
           })
         ),
 
@@ -225,12 +160,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.update(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "update",
-                model: "${modelName}"
-              })
+            catch: (error) => mapUpdateError(error, "update", "${modelName}")
           })
         ),
 
@@ -238,12 +168,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.deleteMany(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "deleteMany",
-                model: "${modelName}"
-              })
+            catch: (error) => mapDeleteManyError(error, "deleteMany", "${modelName}")
           })
         ),
 
@@ -251,12 +176,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.updateMany(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "updateMany",
-                model: "${modelName}"
-              })
+            catch: (error) => mapUpdateManyError(error, "updateMany", "${modelName}")
           })
         ),
 
@@ -264,12 +184,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.updateManyAndReturn(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "updateManyAndReturn",
-                model: "${modelName}"
-              })
+            catch: (error) => mapUpdateManyError(error, "updateManyAndReturn", "${modelName}")
           })
         ),
 
@@ -277,12 +192,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.upsert(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "upsert",
-                model: "${modelName}"
-              })
+            catch: (error) => mapCreateError(error, "upsert", "${modelName}")
           })
         ),
 
@@ -291,12 +201,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.count(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "count",
-                model: "${modelName}"
-              })
+            catch: (error) => mapFindError(error, "count", "${modelName}")
           })
         ),
 
@@ -304,12 +209,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.aggregate(args),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "aggregate",
-                model: "${modelName}"
-              })
+            catch: (error) => mapFindError(error, "aggregate", "${modelName}")
           })
         ),
 
@@ -317,12 +217,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.groupBy(args as any),
-            catch: (error) =>
-              new PrismaError({
-                error,
-                operation: "groupBy",
-                model: "${modelName}"
-              })
+            catch: (error) => mapFindError(error, "groupBy", "${modelName}")
           })
         )
     }`;
@@ -339,9 +234,9 @@ async function generateUnifiedService(
   const modelOperations = generateModelOperations(models);
 
   const serviceContent = `${header}
-import { Context, Data, Effect, Layer, Runtime } from "effect"
+import { Cause, Context, Data, Effect, Exit, Layer, Runtime } from "effect"
 import { Service } from "effect/Effect"
-import { type Prisma, PrismaClient } from "${clientImportPath}"
+import { Prisma, PrismaClient } from "${clientImportPath}"
 
 export class PrismaClientService extends Context.Tag("PrismaClientService")<
   PrismaClientService,
@@ -364,11 +259,348 @@ export const LivePrismaLayer = Layer.effect(
   })
 )
 
-export class PrismaError extends Data.TaggedError("PrismaError")<{
-  error: unknown
+export class PrismaUniqueConstraintError extends Data.TaggedError("PrismaUniqueConstraintError")<{
+  cause: Prisma.PrismaClientKnownRequestError
   operation: string
   model: string
 }> {}
+
+export class PrismaForeignKeyConstraintError extends Data.TaggedError("PrismaForeignKeyConstraintError")<{
+  cause: Prisma.PrismaClientKnownRequestError
+  operation: string
+  model: string
+}> {}
+
+export class PrismaRecordNotFoundError extends Data.TaggedError("PrismaRecordNotFoundError")<{
+  cause: Prisma.PrismaClientKnownRequestError
+  operation: string
+  model: string
+}> {}
+
+export class PrismaRelationViolationError extends Data.TaggedError("PrismaRelationViolationError")<{
+  cause: Prisma.PrismaClientKnownRequestError
+  operation: string
+  model: string
+}> {}
+
+export class PrismaRelatedRecordNotFoundError extends Data.TaggedError("PrismaRelatedRecordNotFoundError")<{
+  cause: Prisma.PrismaClientKnownRequestError
+  operation: string
+  model: string
+}> {}
+
+export class PrismaTransactionConflictError extends Data.TaggedError("PrismaTransactionConflictError")<{
+  cause: Prisma.PrismaClientKnownRequestError
+  operation: string
+  model: string
+}> {}
+
+export class PrismaValueTooLongError extends Data.TaggedError("PrismaValueTooLongError")<{
+  cause: Prisma.PrismaClientKnownRequestError
+  operation: string
+  model: string
+}> {}
+
+export class PrismaValueOutOfRangeError extends Data.TaggedError("PrismaValueOutOfRangeError")<{
+  cause: Prisma.PrismaClientKnownRequestError
+  operation: string
+  model: string
+}> {}
+
+export class PrismaDbConstraintError extends Data.TaggedError("PrismaDbConstraintError")<{
+  cause: Prisma.PrismaClientKnownRequestError
+  operation: string
+  model: string
+}> {}
+
+export class PrismaConnectionError extends Data.TaggedError("PrismaConnectionError")<{
+  cause: Prisma.PrismaClientKnownRequestError
+  operation: string
+  model: string
+}> {}
+
+export class PrismaMissingRequiredValueError extends Data.TaggedError("PrismaMissingRequiredValueError")<{
+  cause: Prisma.PrismaClientKnownRequestError
+  operation: string
+  model: string
+}> {}
+
+export class PrismaInputValidationError extends Data.TaggedError("PrismaInputValidationError")<{
+  cause: Prisma.PrismaClientKnownRequestError
+  operation: string
+  model: string
+}> {}
+
+export type PrismaCreateError =
+  | PrismaValueTooLongError
+  | PrismaUniqueConstraintError
+  | PrismaForeignKeyConstraintError
+  | PrismaDbConstraintError
+  | PrismaInputValidationError
+  | PrismaMissingRequiredValueError
+  | PrismaRelatedRecordNotFoundError
+  | PrismaValueOutOfRangeError
+  | PrismaConnectionError
+  | PrismaTransactionConflictError
+
+export type PrismaUpdateError =
+  | PrismaValueTooLongError
+  | PrismaUniqueConstraintError
+  | PrismaForeignKeyConstraintError
+  | PrismaDbConstraintError
+  | PrismaInputValidationError
+  | PrismaMissingRequiredValueError
+  | PrismaRelationViolationError
+  | PrismaRelatedRecordNotFoundError
+  | PrismaValueOutOfRangeError
+  | PrismaConnectionError
+  | PrismaRecordNotFoundError
+  | PrismaTransactionConflictError
+
+export type PrismaDeleteError =
+  | PrismaForeignKeyConstraintError
+  | PrismaRelationViolationError
+  | PrismaConnectionError
+  | PrismaRecordNotFoundError
+  | PrismaTransactionConflictError
+
+export type PrismaFindOrThrowError =
+  | PrismaConnectionError
+  | PrismaRecordNotFoundError
+
+export type PrismaFindError =
+  | PrismaConnectionError
+
+export type PrismaDeleteManyError =
+  | PrismaForeignKeyConstraintError
+  | PrismaRelationViolationError
+  | PrismaConnectionError
+  | PrismaTransactionConflictError
+
+export type PrismaUpdateManyError =
+  | PrismaValueTooLongError
+  | PrismaUniqueConstraintError
+  | PrismaForeignKeyConstraintError
+  | PrismaDbConstraintError
+  | PrismaInputValidationError
+  | PrismaMissingRequiredValueError
+  | PrismaValueOutOfRangeError
+  | PrismaConnectionError
+  | PrismaTransactionConflictError
+
+export type PrismaError =
+  | PrismaValueTooLongError
+  | PrismaUniqueConstraintError
+  | PrismaForeignKeyConstraintError
+  | PrismaDbConstraintError
+  | PrismaInputValidationError
+  | PrismaMissingRequiredValueError
+  | PrismaRelationViolationError
+  | PrismaRelatedRecordNotFoundError
+  | PrismaValueOutOfRangeError
+  | PrismaConnectionError
+  | PrismaRecordNotFoundError
+  | PrismaTransactionConflictError
+
+// Generic mapper for raw operations and fallback
+const mapError = (error: unknown, operation: string, model: string): PrismaError => {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    switch (error.code) {
+      case "P2000":
+        return new PrismaValueTooLongError({ cause: error, operation, model });
+      case "P2002":
+        return new PrismaUniqueConstraintError({ cause: error, operation, model });
+      case "P2003":
+        return new PrismaForeignKeyConstraintError({ cause: error, operation, model });
+      case "P2004":
+        return new PrismaDbConstraintError({ cause: error, operation, model });
+      case "P2005":
+      case "P2006":
+      case "P2019":
+        return new PrismaInputValidationError({ cause: error, operation, model });
+      case "P2011":
+      case "P2012":
+        return new PrismaMissingRequiredValueError({ cause: error, operation, model });
+      case "P2014":
+        return new PrismaRelationViolationError({ cause: error, operation, model });
+      case "P2015":
+      case "P2018":
+        return new PrismaRelatedRecordNotFoundError({ cause: error, operation, model });
+      case "P2020":
+        return new PrismaValueOutOfRangeError({ cause: error, operation, model });
+      case "P2024":
+        return new PrismaConnectionError({ cause: error, operation, model });
+      case "P2025":
+        return new PrismaRecordNotFoundError({ cause: error, operation, model });
+      case "P2034":
+        return new PrismaTransactionConflictError({ cause: error, operation, model });
+    }
+  }
+  // Unknown errors are not handled and will be treated as defects
+  throw error;
+}
+
+// Specific mappers to narrow error types per operation
+
+// Create, Upsert
+const mapCreateError = (error: unknown, operation: string, model: string): PrismaCreateError => {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    switch (error.code) {
+      case "P2000":
+        return new PrismaValueTooLongError({ cause: error, operation, model });
+      case "P2002":
+        return new PrismaUniqueConstraintError({ cause: error, operation, model });
+      case "P2003":
+        return new PrismaForeignKeyConstraintError({ cause: error, operation, model });
+      case "P2004":
+        return new PrismaDbConstraintError({ cause: error, operation, model });
+      case "P2005":
+      case "P2006":
+      case "P2019":
+        return new PrismaInputValidationError({ cause: error, operation, model });
+      case "P2011":
+      case "P2012":
+        return new PrismaMissingRequiredValueError({ cause: error, operation, model });
+      case "P2015":
+      case "P2018":
+        return new PrismaRelatedRecordNotFoundError({ cause: error, operation, model });
+      case "P2020":
+        return new PrismaValueOutOfRangeError({ cause: error, operation, model });
+      case "P2024":
+        return new PrismaConnectionError({ cause: error, operation, model });
+      case "P2034":
+        return new PrismaTransactionConflictError({ cause: error, operation, model });
+    }
+  }
+  throw error;
+}
+
+// Update
+const mapUpdateError = (error: unknown, operation: string, model: string): PrismaUpdateError => {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    switch (error.code) {
+      case "P2000":
+        return new PrismaValueTooLongError({ cause: error, operation, model });
+      case "P2002":
+        return new PrismaUniqueConstraintError({ cause: error, operation, model });
+      case "P2003":
+        return new PrismaForeignKeyConstraintError({ cause: error, operation, model });
+      case "P2004":
+        return new PrismaDbConstraintError({ cause: error, operation, model });
+      case "P2005":
+      case "P2006":
+      case "P2019":
+        return new PrismaInputValidationError({ cause: error, operation, model });
+      case "P2011":
+      case "P2012":
+        return new PrismaMissingRequiredValueError({ cause: error, operation, model });
+      case "P2014":
+        return new PrismaRelationViolationError({ cause: error, operation, model });
+      case "P2015":
+      case "P2018":
+        return new PrismaRelatedRecordNotFoundError({ cause: error, operation, model });
+      case "P2020":
+        return new PrismaValueOutOfRangeError({ cause: error, operation, model });
+      case "P2024":
+        return new PrismaConnectionError({ cause: error, operation, model });
+      case "P2025":
+        return new PrismaRecordNotFoundError({ cause: error, operation, model });
+      case "P2034":
+        return new PrismaTransactionConflictError({ cause: error, operation, model });
+    }
+  }
+  throw error;
+}
+
+// Delete
+const mapDeleteError = (error: unknown, operation: string, model: string): PrismaDeleteError => {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    switch (error.code) {
+      case "P2003":
+        return new PrismaForeignKeyConstraintError({ cause: error, operation, model });
+      case "P2014":
+        return new PrismaRelationViolationError({ cause: error, operation, model });
+      case "P2024":
+        return new PrismaConnectionError({ cause: error, operation, model });
+      case "P2025":
+        return new PrismaRecordNotFoundError({ cause: error, operation, model });
+      case "P2034":
+        return new PrismaTransactionConflictError({ cause: error, operation, model });
+    }
+  }
+  throw error;
+}
+
+// FindOrThrow
+const mapFindOrThrowError = (error: unknown, operation: string, model: string): PrismaFindOrThrowError => {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    switch (error.code) {
+      case "P2024":
+        return new PrismaConnectionError({ cause: error, operation, model });
+      case "P2025":
+        return new PrismaRecordNotFoundError({ cause: error, operation, model });
+    }
+  }
+  throw error;
+}
+
+// Find
+const mapFindError = (error: unknown, operation: string, model: string): PrismaFindError => {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    switch (error.code) {
+      case "P2024":
+        return new PrismaConnectionError({ cause: error, operation, model });
+    }
+  }
+  throw error;
+}
+
+// DeleteMany
+const mapDeleteManyError = (error: unknown, operation: string, model: string): PrismaDeleteManyError => {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    switch (error.code) {
+      case "P2003":
+        return new PrismaForeignKeyConstraintError({ cause: error, operation, model });
+      case "P2014":
+        return new PrismaRelationViolationError({ cause: error, operation, model });
+      case "P2024":
+        return new PrismaConnectionError({ cause: error, operation, model });
+      case "P2034":
+        return new PrismaTransactionConflictError({ cause: error, operation, model });
+    }
+  }
+  throw error;
+}
+
+// UpdateMany
+const mapUpdateManyError = (error: unknown, operation: string, model: string): PrismaUpdateManyError => {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    switch (error.code) {
+      case "P2000":
+        return new PrismaValueTooLongError({ cause: error, operation, model });
+      case "P2002":
+        return new PrismaUniqueConstraintError({ cause: error, operation, model });
+      case "P2003":
+        return new PrismaForeignKeyConstraintError({ cause: error, operation, model });
+      case "P2004":
+        return new PrismaDbConstraintError({ cause: error, operation, model });
+      case "P2005":
+      case "P2006":
+      case "P2019":
+        return new PrismaInputValidationError({ cause: error, operation, model });
+      case "P2011":
+      case "P2012":
+        return new PrismaMissingRequiredValueError({ cause: error, operation, model });
+      case "P2020":
+        return new PrismaValueOutOfRangeError({ cause: error, operation, model });
+      case "P2024":
+        return new PrismaConnectionError({ cause: error, operation, model });
+      case "P2034":
+        return new PrismaTransactionConflictError({ cause: error, operation, model });
+    }
+  }
+  throw error;
+}
 
 export class PrismaService extends Service<PrismaService>()("PrismaService", {
   effect: Effect.gen(function* () {

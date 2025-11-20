@@ -1,6 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
-import { LivePrismaLayer, PrismaService } from "./generated/effect/index.js";
+import { Data, Effect, Layer } from "effect";
+import {
+  LivePrismaLayer,
+  PrismaService,
+  PrismaUniqueConstraintError,
+} from "./generated/effect/index.js";
 
 describe("Prisma Effect Generator", () => {
   const MainLayer = Layer.merge(LivePrismaLayer, PrismaService.Default);
@@ -103,6 +107,36 @@ describe("Prisma Effect Generator", () => {
         where: { email: { in: [email, nestedEmail] } },
       });
       expect(found.length).toBe(0);
+    }).pipe(Effect.provide(MainLayer)),
+  );
+
+  it.effect("should return PrismaUniqueConstraintError on duplicate key", () =>
+    Effect.gen(function* () {
+      const prisma = yield* PrismaService;
+      const email = `duplicate-test-${Date.now()}@example.com`;
+
+      // Create first user
+      yield* prisma.user.create({
+        data: { email, name: "User 1" },
+      });
+
+      // Try to create second user with same email
+      const result = yield* Effect.flip(
+        prisma.user.create({
+          data: { email, name: "User 2" },
+        }),
+      );
+
+      // Verify error type
+      expect(result).toBeInstanceOf(PrismaUniqueConstraintError);
+      if (result instanceof PrismaUniqueConstraintError) {
+        expect(result.cause.code).toBe("P2002");
+      }
+
+      // Cleanup
+      yield* prisma.user.delete({
+        where: { email },
+      });
     }).pipe(Effect.provide(MainLayer)),
   );
 
