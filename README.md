@@ -131,49 +131,43 @@ export class PrismaError extends Data.TaggedError("PrismaError")<{
 
 ### Transactions
 
-The generator supports sharing the transaction context via the `PrismaClientService` tag. You can create a helper to run effects within a Prisma transaction:
+The generated service includes a `$transaction` method that allows you to run multiple operations within a database transaction.
 
 ```typescript
-import { Effect, Runtime } from "effect";
-import {
-  PrismaClientService,
-  PrismaService,
-  PrismaError,
-} from "./generated/effect";
-
-const runInTransaction = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-  Effect.gen(function* () {
-    // 1. Get the Prisma Client
-    const { client } = yield* PrismaClientService;
-
-    // 2. Capture the current Runtime to preserve context (services, fiber refs)
-    const runtime = yield* Effect.runtime<R>();
-
-    // 3. Execute the transaction
-    return yield* Effect.tryPromise({
-      try: () =>
-        client.$transaction((tx) => {
-          // 4. Run the effect using the captured runtime,
-          // providing the transaction client to the service
-          return Runtime.runPromise(runtime)(
-            Effect.provideService(effect, PrismaClientService, { tx, client }),
-          );
-        }),
-      catch: (error) =>
-        new PrismaError({ error, operation: "transaction", model: "Prisma" }),
-    });
-  });
-
-// Usage Example
 const program = Effect.gen(function* () {
   const prisma = yield* PrismaService;
 
-  yield* runInTransaction(
+  yield* prisma.$transaction(
     Effect.gen(function* () {
       const user = yield* prisma.user.create({ data: { name: "Alice" } });
       yield* prisma.post.create({
         data: { title: "Hello", authorId: user.id },
       });
+    }),
+  );
+});
+```
+
+### Nested Transactions
+
+The `$transaction` method supports nesting. If you call `$transaction` within an existing transaction, it will reuse the parent transaction context. If any operation fails, the entire transaction (including the parent) is rolled back.
+
+```typescript
+const program = Effect.gen(function* () {
+  const prisma = yield* PrismaService;
+
+  yield* prisma.$transaction(
+    Effect.gen(function* () {
+      // Operation 1
+      yield* prisma.user.create({ data: { name: "Parent" } });
+
+      // Nested transaction
+      yield* prisma.$transaction(
+        Effect.gen(function* () {
+          // Operation 2
+          yield* prisma.user.create({ data: { name: "Child" } });
+        }),
+      );
     }),
   );
 });
