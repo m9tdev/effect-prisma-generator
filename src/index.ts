@@ -39,9 +39,6 @@ generatorHandler({
 
     // Generate unified index file with PrismaService
     await generateUnifiedService([...models], outputDir, clientImportPath);
-
-    // Generate types file
-    await generateTypes([...models], outputDir, clientImportPath);
   },
 });
 
@@ -99,19 +96,7 @@ function generateModelOperations(models: DMMF.Model[]) {
       const modelNameCamel = toCamelCase(modelName);
 
       return `    ${modelNameCamel}: {
-      // Find operations
-      findMany: (args?: Prisma.${modelName}FindManyArgs) =>
-        Effect.tryPromise({
-          try: () => client.${modelNameCamel}.findMany(args),
-          catch: (error) =>
-            new PrismaError({
-              error,
-              operation: "findMany",
-              model: "${modelName}"
-            })
-        }),
-
-      findUnique: (args: Prisma.${modelName}FindUniqueArgs) =>
+      findUnique: (args: Parameters<PrismaClient['${modelNameCamel}']['findUnique']>[0]) =>
         Effect.tryPromise({
           try: () => client.${modelNameCamel}.findUnique(args),
           catch: (error) =>
@@ -122,18 +107,7 @@ function generateModelOperations(models: DMMF.Model[]) {
             })
         }),
 
-      findFirst: (args?: Prisma.${modelName}FindFirstArgs) =>
-        Effect.tryPromise({
-          try: () => client.${modelNameCamel}.findFirst(args),
-          catch: (error) =>
-            new PrismaError({
-              error,
-              operation: "findFirst",
-              model: "${modelName}"
-            })
-        }),
-
-      findUniqueOrThrow: (args: Prisma.${modelName}FindUniqueOrThrowArgs) =>
+      findUniqueOrThrow: (args: Parameters<PrismaClient['${modelNameCamel}']['findUniqueOrThrow']>[0]) =>
         Effect.tryPromise({
           try: () => client.${modelNameCamel}.findUniqueOrThrow(args),
           catch: (error) =>
@@ -144,7 +118,18 @@ function generateModelOperations(models: DMMF.Model[]) {
             })
         }),
 
-      findFirstOrThrow: (args?: Prisma.${modelName}FindFirstOrThrowArgs) =>
+      findFirst: (args?: Parameters<PrismaClient['${modelNameCamel}']['findFirst']>[0]) =>
+        Effect.tryPromise({
+          try: () => client.${modelNameCamel}.findFirst(args),
+          catch: (error) =>
+            new PrismaError({
+              error,
+              operation: "findFirst",
+              model: "${modelName}"
+            })
+        }),
+
+      findFirstOrThrow: (args?: Parameters<PrismaClient['${modelNameCamel}']['findFirstOrThrow']>[0]) =>
         Effect.tryPromise({
           try: () => client.${modelNameCamel}.findFirstOrThrow(args),
           catch: (error) =>
@@ -155,8 +140,18 @@ function generateModelOperations(models: DMMF.Model[]) {
             })
         }),
 
-      // Create operations
-      create: (args: Prisma.${modelName}CreateArgs) =>
+      findMany: (args?: Parameters<PrismaClient['${modelNameCamel}']['findMany']>[0]) =>
+        Effect.tryPromise({
+          try: () => client.${modelNameCamel}.findMany(args),
+          catch: (error) =>
+            new PrismaError({
+              error,
+              operation: "findMany",
+              model: "${modelName}"
+            })
+        }),
+
+      create: (args: Parameters<PrismaClient['${modelNameCamel}']['create']>[0]) =>
         Effect.tryPromise({
           try: () => client.${modelNameCamel}.create(args),
           catch: (error) =>
@@ -167,7 +162,7 @@ function generateModelOperations(models: DMMF.Model[]) {
             })
         }),
 
-      createMany: (args: Prisma.${modelName}CreateManyArgs) =>
+      createMany: (args?: Parameters<PrismaClient['${modelNameCamel}']['createMany']>[0]) =>
         Effect.tryPromise({
           try: () => client.${modelNameCamel}.createMany(args),
           catch: (error) =>
@@ -178,7 +173,7 @@ function generateModelOperations(models: DMMF.Model[]) {
             })
         }),
 
-      createManyAndReturn: (args: Prisma.${modelName}CreateManyAndReturnArgs) =>
+      createManyAndReturn: (args?: Parameters<PrismaClient['${modelNameCamel}']['createManyAndReturn']>[0]) =>
         Effect.tryPromise({
           try: () => client.${modelNameCamel}.createManyAndReturn(args),
           catch: (error) =>
@@ -189,42 +184,7 @@ function generateModelOperations(models: DMMF.Model[]) {
             })
         }),
 
-      // Update operations
-      update: (args: Prisma.${modelName}UpdateArgs) =>
-        Effect.tryPromise({
-          try: () => client.${modelNameCamel}.update(args),
-          catch: (error) =>
-            new PrismaError({
-              error,
-              operation: "update",
-              model: "${modelName}"
-            })
-        }),
-
-      updateMany: (args: Prisma.${modelName}UpdateManyArgs) =>
-        Effect.tryPromise({
-          try: () => client.${modelNameCamel}.updateMany(args),
-          catch: (error) =>
-            new PrismaError({
-              error,
-              operation: "updateMany",
-              model: "${modelName}"
-            })
-        }),
-
-      upsert: (args: Prisma.${modelName}UpsertArgs) =>
-        Effect.tryPromise({
-          try: () => client.${modelNameCamel}.upsert(args),
-          catch: (error) =>
-            new PrismaError({
-              error,
-              operation: "upsert",
-              model: "${modelName}"
-            })
-        }),
-
-      // Delete operations
-      delete: (args: Prisma.${modelName}DeleteArgs) =>
+      delete: (args: Parameters<PrismaClient['${modelNameCamel}']['delete']>[0]) =>
         Effect.tryPromise({
           try: () => client.${modelNameCamel}.delete(args),
           catch: (error) =>
@@ -235,7 +195,18 @@ function generateModelOperations(models: DMMF.Model[]) {
             })
         }),
 
-      deleteMany: (args?: Prisma.${modelName}DeleteManyArgs) =>
+      update: (args: Parameters<PrismaClient['${modelNameCamel}']['update']>[0]) =>
+        Effect.tryPromise({
+          try: () => client.${modelNameCamel}.update(args),
+          catch: (error) =>
+            new PrismaError({
+              error,
+              operation: "update",
+              model: "${modelName}"
+            })
+        }),
+
+      deleteMany: (args?: Parameters<PrismaClient['${modelNameCamel}']['deleteMany']>[0]) =>
         Effect.tryPromise({
           try: () => client.${modelNameCamel}.deleteMany(args),
           catch: (error) =>
@@ -246,8 +217,41 @@ function generateModelOperations(models: DMMF.Model[]) {
             })
         }),
 
+      updateMany: (args: Parameters<PrismaClient['${modelNameCamel}']['updateMany']>[0]) =>
+        Effect.tryPromise({
+          try: () => client.${modelNameCamel}.updateMany(args),
+          catch: (error) =>
+            new PrismaError({
+              error,
+              operation: "updateMany",
+              model: "${modelName}"
+            })
+        }),
+
+      updateManyAndReturn: (args: Parameters<PrismaClient['${modelNameCamel}']['updateManyAndReturn']>[0]) =>
+        Effect.tryPromise({
+          try: () => client.${modelNameCamel}.updateManyAndReturn(args),
+          catch: (error) =>
+            new PrismaError({
+              error,
+              operation: "updateManyAndReturn",
+              model: "${modelName}"
+            })
+        }),
+
+      upsert: (args: Parameters<PrismaClient['${modelNameCamel}']['upsert']>[0]) =>
+        Effect.tryPromise({
+          try: () => client.${modelNameCamel}.upsert(args),
+          catch: (error) =>
+            new PrismaError({
+              error,
+              operation: "upsert",
+              model: "${modelName}"
+            })
+        }),
+
       // Aggregation operations
-      count: (args?: Prisma.${modelName}CountArgs) =>
+      count: (args?: Parameters<PrismaClient['${modelNameCamel}']['count']>[0]) =>
         Effect.tryPromise({
           try: () => client.${modelNameCamel}.count(args),
           catch: (error) =>
@@ -258,7 +262,7 @@ function generateModelOperations(models: DMMF.Model[]) {
             })
         }),
 
-      aggregate: (args: Prisma.${modelName}AggregateArgs) =>
+      aggregate: (args: Parameters<PrismaClient['${modelNameCamel}']['aggregate']>[0]) =>
         Effect.tryPromise({
           try: () => client.${modelNameCamel}.aggregate(args),
           catch: (error) =>
@@ -269,7 +273,7 @@ function generateModelOperations(models: DMMF.Model[]) {
             })
         }),
 
-      groupBy: <T extends Prisma.${modelName}GroupByArgs>(args: T) =>
+      groupBy: (args: Parameters<PrismaClient['${modelNameCamel}']['groupBy']>[0]) =>
         Effect.tryPromise({
           try: () => client.${modelNameCamel}.groupBy(args as any),
           catch: (error) =>
@@ -296,7 +300,6 @@ async function generateUnifiedService(
 import { Context, Data, Effect, Layer } from "effect"
 import { Service } from "effect/Effect"
 import { type Prisma, PrismaClient } from "${clientImportPath}"
-import { type EffectPrismaService } from "./types.js"
 
 export class PrismaClientService extends Context.Tag("PrismaClientService")<
   PrismaClientService,
@@ -332,58 +335,10 @@ export class PrismaService extends Service<PrismaService>()("PrismaService", {
       ${rawSqlOperations}
 
       ${modelOperations}
-    } as unknown as EffectPrismaService
+    }
   })
 }) {}
 `;
 
   await fs.writeFile(path.join(outputDir, "index.ts"), serviceContent);
-}
-
-async function generateTypes(
-  models: DMMF.Model[],
-  outputDir: string,
-  clientImportPath: string,
-) {
-  const modelTypeDefinitions = models
-    .map((model) => {
-      const modelName = model.name;
-      const modelNameCamel = toCamelCase(modelName);
-
-      return `  ${modelNameCamel}: {
-    findMany: <T extends Prisma.${modelName}FindManyArgs>(args?: T) => Effect.Effect<Array<Prisma.${modelName}GetPayload<T>>, PrismaError>
-    findUnique: <T extends Prisma.${modelName}FindUniqueArgs>(args: T) => Effect.Effect<Prisma.${modelName}GetPayload<T> | null, PrismaError>
-    findFirst: <T extends Prisma.${modelName}FindFirstArgs>(args?: T) => Effect.Effect<Prisma.${modelName}GetPayload<T> | null, PrismaError>
-    findUniqueOrThrow: <T extends Prisma.${modelName}FindUniqueOrThrowArgs>(args: T) => Effect.Effect<Prisma.${modelName}GetPayload<T>, PrismaError>
-    findFirstOrThrow: <T extends Prisma.${modelName}FindFirstOrThrowArgs>(args?: T) => Effect.Effect<Prisma.${modelName}GetPayload<T>, PrismaError>
-    create: <T extends Prisma.${modelName}CreateArgs>(args: T) => Effect.Effect<Prisma.${modelName}GetPayload<T>, PrismaError>
-    createMany: (args: Prisma.${modelName}CreateManyArgs) => Effect.Effect<Prisma.BatchPayload, PrismaError>
-    createManyAndReturn: <T extends Prisma.${modelName}CreateManyAndReturnArgs>(args: T) => Effect.Effect<Array<Prisma.${modelName}GetPayload<T>>, PrismaError>
-    update: <T extends Prisma.${modelName}UpdateArgs>(args: T) => Effect.Effect<Prisma.${modelName}GetPayload<T>, PrismaError>
-    updateMany: (args: Prisma.${modelName}UpdateManyArgs) => Effect.Effect<Prisma.BatchPayload, PrismaError>
-    upsert: <T extends Prisma.${modelName}UpsertArgs>(args: T) => Effect.Effect<Prisma.${modelName}GetPayload<T>, PrismaError>
-    delete: <T extends Prisma.${modelName}DeleteArgs>(args: T) => Effect.Effect<Prisma.${modelName}GetPayload<T>, PrismaError>
-    deleteMany: (args?: Prisma.${modelName}DeleteManyArgs) => Effect.Effect<Prisma.BatchPayload, PrismaError>
-    count: (args?: Prisma.${modelName}CountArgs) => Effect.Effect<number, PrismaError>
-    aggregate: <T extends Prisma.${modelName}AggregateArgs>(args: T) => Effect.Effect<Prisma.GetScalarType<T, Prisma.${modelName}GetPayload<T>>, PrismaError>
-    groupBy: <T extends Prisma.${modelName}GroupByArgs>(args: T) => Effect.Effect<any, PrismaError> // Complexity of GroupBy types is high, falling back to any for now or basic checks
-  }`;
-    })
-    .join("\n");
-
-  const typeContent = `${header}
-import type { Effect } from "effect"
-import type { Prisma } from "${clientImportPath}"
-import type { PrismaError } from "./index.js"
-
-export type EffectPrismaService = {
-  $executeRaw: (args: Prisma.Sql | [Prisma.Sql, ...any[]]) => Effect.Effect<number, PrismaError>
-  $executeRawUnsafe: (query: string, ...values: any[]) => Effect.Effect<number, PrismaError>
-  $queryRaw: (args: Prisma.Sql | [Prisma.Sql, ...any[]]) => Effect.Effect<unknown, PrismaError>
-  $queryRawUnsafe: (query: string, ...values: any[]) => Effect.Effect<unknown, PrismaError>
-  ${modelTypeDefinitions}
-}
-`;
-
-  await fs.writeFile(path.join(outputDir, "types.ts"), typeContent);
 }
