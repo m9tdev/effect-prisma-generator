@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["tests/**/*", "src/**/*"],
+  "exclude": ["tests/effect/**"],
+  "compilerOptions": {
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "types": ["vitest/globals"]
+  }
+}
