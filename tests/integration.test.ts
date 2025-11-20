@@ -71,6 +71,7 @@ describe("Prisma Effect Generator", () => {
     Effect.gen(function* () {
       const prisma = yield* PrismaService;
       const email = `rollback-test-${Date.now()}@example.com`;
+      const nestedEmail = `nested-rollback-test-${Date.now()}@example.com`;
 
       const program = prisma.$transaction(
         Effect.gen(function* () {
@@ -81,6 +82,14 @@ describe("Prisma Effect Generator", () => {
             },
           });
 
+          yield* prisma.$transaction(
+            Effect.gen(function* () {
+              yield* prisma.user.create({
+                data: { email: nestedEmail, name: "Nested User" },
+              });
+            }),
+          );
+
           // Force error
           yield* Effect.fail("Boom");
         }),
@@ -90,10 +99,10 @@ describe("Prisma Effect Generator", () => {
       yield* Effect.flip(program);
 
       // Verify rollback
-      const found = yield* prisma.user.findUnique({
-        where: { email },
+      const found = yield* prisma.user.findMany({
+        where: { email: { in: [email, nestedEmail] } },
       });
-      expect(found).toBeNull();
+      expect(found.length).toBe(0);
     }).pipe(Effect.provide(MainLayer)),
   );
 });

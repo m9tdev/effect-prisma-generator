@@ -383,8 +383,12 @@ export class PrismaService extends Service<PrismaService>()("PrismaService", {
       ) =>
         Effect.flatMap(
           Effect.all([PrismaClientService, Effect.runtime<R>()]),
-          ([{ client }, runtime]) =>
-            Effect.tryPromise({
+          ([{ client }, runtime]): Effect.Effect<A, E | PrismaError, R> => {
+            const isRootClient = "$transaction" in tx;
+            if (!isRootClient) {
+              return effect
+            }
+            return Effect.tryPromise({
               try: () =>
                 client.$transaction(
                   async (tx) => {
@@ -406,6 +410,7 @@ export class PrismaService extends Service<PrismaService>()("PrismaService", {
                   model: "Prisma",
                 }),
             })
+          }
         ),
       ${rawSqlOperations}
 
