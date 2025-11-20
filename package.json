@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "build": "tsc && chmod +x dist/index.js",
-    "test": "npm run build && prisma generate --schema=tests/schema.prisma && prisma db push --schema=tests/schema.prisma && tsc --noEmit --project tsconfig.test.json && vitest run",
+    "test": "tsx scripts/runTests.ts",
     "prepublishOnly": "npm run build"
   },
   "repository": {
@@ -31,11 +31,14 @@
     "typescript": "^5.9.3"
   },
   "devDependencies": {
+    "@effect/platform": "^0.93.3",
+    "@effect/platform-node": "^0.101.0",
     "@effect/vitest": "^0.27.0",
     "@prisma/client": "^6.19.0",
     "@types/node": "^24.10.1",
     "effect": "^3.13.4",
     "prisma": "^6.19.0",
+    "tsx": "^4.20.6",
     "vitest": "^3.0.7"
   }
 }
