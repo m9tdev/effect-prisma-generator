@@ -129,4 +129,50 @@ export class PrismaError extends Data.TaggedError("PrismaError")<{
 
 ### Transactions
 
-The generator supports sharing the transaction context via the `PrismaClientService` tag if you need to implement interactive transactions.
+The generator supports sharing the transaction context via the `PrismaClientService` tag. You can create a helper to run effects within a Prisma transaction:
+
+```typescript
+import { Effect, Runtime } from "effect";
+import {
+  PrismaClientService,
+  PrismaService,
+  PrismaError,
+} from "./generated/effect";
+
+const runInTransaction = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  Effect.gen(function* () {
+    // 1. Get the Prisma Client
+    const { client } = yield* PrismaClientService;
+
+    // 2. Capture the current Runtime to preserve context (services, fiber refs)
+    const runtime = yield* Effect.runtime<R>();
+
+    // 3. Execute the transaction
+    return yield* Effect.tryPromise({
+      try: () =>
+        client.$transaction((tx) => {
+          // 4. Run the effect using the captured runtime,
+          // providing the transaction client to the service
+          return Runtime.runPromise(runtime)(
+            Effect.provideService(effect, PrismaClientService, { tx, client }),
+          );
+        }),
+      catch: (error) =>
+        new PrismaError({ error, operation: "transaction", model: "Prisma" }),
+    });
+  });
+
+// Usage Example
+const program = Effect.gen(function* () {
+  const prisma = yield* PrismaService;
+
+  yield* runInTransaction(
+    Effect.gen(function* () {
+      const user = yield* prisma.user.create({ data: { name: "Alice" } });
+      yield* prisma.post.create({
+        data: { title: "Hello", authorId: user.id },
+      });
+    }),
+  );
+});
+```
