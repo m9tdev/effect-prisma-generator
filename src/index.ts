@@ -383,7 +383,7 @@ export class PrismaService extends Service<PrismaService>()("PrismaService", {
       ) =>
         Effect.flatMap(
           Effect.all([PrismaClientService, Effect.runtime<R>()]),
-          ([{ client }, runtime]): Effect.Effect<A, E | PrismaError, R> => {
+          ([{ client, tx }, runtime]): Effect.Effect<A, E | PrismaError, R> => {
             const isRootClient = "$transaction" in tx;
             if (!isRootClient) {
               return effect
