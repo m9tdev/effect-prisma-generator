@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.1.0...v0.2.0) (2025-11-20)
+
+
+### Features
+
+* add clientImportPath option ([767961e](https://github.com/m9tdev/effect-prisma-generator/commit/767961ef5c70a4f1a50c5c87e20cac5f5e88e618))
+
 ## 0.1.0 (2025-11-19)
 
 
