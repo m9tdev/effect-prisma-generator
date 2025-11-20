@@ -105,4 +105,25 @@ describe("Prisma Effect Generator", () => {
       expect(found.length).toBe(0);
     }).pipe(Effect.provide(MainLayer)),
   );
+
+  it.effect("should preserve custom error types in transaction", () =>
+    Effect.gen(function* () {
+      class MyCustomError extends Data.TaggedError("MyCustomError")<{
+        message: string;
+      }> {}
+
+      const prisma = yield* PrismaService;
+
+      const program = prisma.$transaction(
+        Effect.fail(new MyCustomError({ message: "boom" })),
+      );
+
+      const error = yield* Effect.flip(program);
+
+      expect(error).toBeInstanceOf(MyCustomError);
+      if (error instanceof MyCustomError) {
+        expect(error.message).toBe("boom");
+      }
+    }).pipe(Effect.provide(MainLayer)),
+  );
 });

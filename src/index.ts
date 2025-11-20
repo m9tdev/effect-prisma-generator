@@ -390,26 +390,22 @@ export class PrismaService extends Service<PrismaService>()("PrismaService", {
             }
             return Effect.tryPromise({
               try: () =>
-                client.$transaction(
-                  async (tx) => {
-                    return await Runtime.runPromise(runtime)(
-                      effect.pipe(
-                        Effect.provideService(PrismaClientService, {
-                          tx,
-                          client,
-                        })
-                      ) as Effect.Effect<A, E, R>
-                    )
-                  },
-                  options
-                ),
-              catch: (error) =>
-                new PrismaError({
-                  error,
-                  operation: "$transaction",
-                  model: "Prisma",
-                }),
-            })
+                client.$transaction(async (tx) => {
+                  const exit = await Runtime.runPromiseExit(runtime)(
+                    effect.pipe(
+                      Effect.provideService(PrismaClientService, {
+                        tx,
+                        client,
+                      }),
+                    ) as Effect.Effect<A, E, R>,
+                  )
+                  if (Exit.isSuccess(exit)) {
+                    return exit.value
+                  }
+                  throw Cause.squash(exit.cause)
+                }, options),
+              catch: (error) => error as E,
+            }) as unknown as Effect.Effect<A, E, R>;
           }
         ),
       ${rawSqlOperations}
