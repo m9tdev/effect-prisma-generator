@@ -7,7 +7,7 @@ A Prisma generator that creates a fully-typed, Effect-based service wrapper for 
 - 🚀 **Effect Integration**: All Prisma operations are wrapped in `Effect` for robust error handling and composability.
 - 🛡️ **Type Safety**: Full TypeScript support with generated types matching your Prisma schema.
 - 🧩 **Dependency Injection**: Integrates seamlessly with Effect's `Layer` and `Context` system.
-- 🔍 **Error Handling**: Automatically catches and wraps Prisma errors into a typed `PrismaError`.
+- 🔍 **Error Handling**: Automatically catches and wraps Prisma errors into specific typed Effect errors.
 
 ## Installation
 
@@ -115,18 +115,55 @@ const program = Effect.gen(function* () {
 
 ## API
 
-The generated `PrismaService` mirrors your Prisma Client API but returns `Effect<Success, PrismaError, Requirements>` instead of Promises.
+The generated `PrismaService` mirrors your Prisma Client API but returns `Effect<Success, Error, PrismaService>` instead of Promises, where `Error` is a specific union type based on the operation (e.g., `PrismaCreateError`, `PrismaUpdateError`, `PrismaFindError`).
 
 ### Error Handling
 
-All operations return an `Effect` that can fail with `PrismaError`.
+All operations return an `Effect` that can fail with specific Prisma errors. The generator maps Prisma's error codes to typed Effect errors.
+
+Each operation type (create, update, delete, find, etc.) returns a specific union of possible errors.
+
+#### Available Errors
+
+- `PrismaUniqueConstraintError`
+- `PrismaForeignKeyConstraintError`
+- `PrismaRecordNotFoundError`
+- `PrismaRelationViolationError`
+- `PrismaRelatedRecordNotFoundError`
+- `PrismaTransactionConflictError`
+- `PrismaValueTooLongError`
+- `PrismaValueOutOfRangeError`
+- `PrismaDbConstraintError`
+- `PrismaConnectionError`
+- `PrismaMissingRequiredValueError`
+- `PrismaInputValidationError`
+
+All errors carry the following context:
+```typescript
+{
+  cause: Prisma.PrismaClientKnownRequestError;
+  operation: string; // e.g. "create", "findUnique"
+  model: string;     // e.g. "User", "Post"
+}
+```
+
+#### Example
 
 ```typescript
-export class PrismaError extends Data.TaggedError("PrismaError")<{
-  error: unknown;
-  operation: string;
-  model: string;
-}> {}
+import { PrismaService, PrismaUniqueConstraintError } from "./generated/effect";
+import { Effect } from "effect";
+
+const program = Effect.gen(function* () {
+  const prisma = yield* PrismaService;
+
+  yield* prisma.user.create({
+    data: { email: "test@example.com", name: "Test" }
+  }).pipe(
+    Effect.catchTag("PrismaUniqueConstraintError", (error) =>
+      Effect.logError(`User with email already exists: ${error.model}`)
+    )
+  );
+});
 ```
 
 ### Transactions
