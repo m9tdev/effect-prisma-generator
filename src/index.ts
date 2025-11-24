@@ -21,22 +21,50 @@ generatorHandler({
 
   async onGenerate(options: GeneratorOptions) {
     const models = options.dmmf.datamodel.models;
-    const outputDir = options.generator.output?.value;
+    const outputPath = options.generator.output?.value;
     const configPath = options.generator.config.clientImportPath;
     const clientImportPath = Array.isArray(configPath)
       ? configPath[0]
-      : (configPath ?? "@prisma/client");
+      : configPath ?? "@prisma/client";
 
-    if (!outputDir) {
-      throw new Error("No output directory specified");
+    if (!outputPath) {
+      throw new Error("No output path specified");
     }
 
-    // Clean output directory
-    await fs.rm(outputDir, { recursive: true, force: true });
-    await fs.mkdir(outputDir, { recursive: true });
+    // Determine if output is a file or directory
+    let outputDir: string;
+    let outputFileName: string;
+    const isFilePath = outputPath.toLowerCase().endsWith(".ts");
 
-    // Generate unified index file with PrismaService
-    await generateUnifiedService([...models], outputDir, clientImportPath);
+    if (isFilePath) {
+      // Output path is a file
+      outputDir = path.dirname(outputPath);
+      outputFileName = path.basename(outputPath);
+    } else {
+      // Output path is a directory (backward compatible)
+      outputDir = outputPath;
+      outputFileName = "index.ts";
+    }
+
+    // Clean output
+    if (isFilePath) {
+      // For file paths, only delete the specific file if it exists
+      // and ensure the directory exists
+      await fs.mkdir(outputDir, { recursive: true });
+      await fs.rm(outputPath, { force: true });
+    } else {
+      // For directory paths, clean the entire directory (backward compatible)
+      await fs.rm(outputDir, { recursive: true, force: true });
+      await fs.mkdir(outputDir, { recursive: true });
+    }
+
+    // Generate unified service file with PrismaService
+    await generateUnifiedService(
+      [...models],
+      outputDir,
+      outputFileName,
+      clientImportPath
+    );
   },
 });
 
@@ -226,7 +254,8 @@ function generateModelOperations(models: DMMF.Model[]) {
 async function generateUnifiedService(
   models: DMMF.Model[],
   outputDir: string,
-  clientImportPath: string,
+  outputFileName: string,
+  clientImportPath: string
 ) {
   const rawSqlOperations = generateRawSqlOperations();
   const modelOperations = generateModelOperations(models);
@@ -634,5 +663,5 @@ export class PrismaService extends Service<PrismaService>()("PrismaService", {
 }) {}
 `;
 
-  await fs.writeFile(path.join(outputDir, "index.ts"), serviceContent);
+  await fs.writeFile(path.join(outputDir, outputFileName), serviceContent);
 }

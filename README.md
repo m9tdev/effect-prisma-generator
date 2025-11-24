@@ -39,6 +39,30 @@ generator effect {
 }
 ```
 
+### Output Options
+
+The `output` field supports two formats:
+
+1. **Directory path** (default): Generates an `index.ts` file in the specified directory
+
+   ```prisma
+   output = "./generated/effect"
+   clientImportPath = "../client"
+   // Creates: ./generated/effect/index.ts
+   ```
+
+2. **File path**: Specify a direct file path ending with `.ts`
+
+   ```prisma
+   output = "./generated/prisma-effect.ts"
+   clientImportPath = "./client"
+   // Creates: ./generated/prisma-effect.ts
+   ```
+
+Both approaches generate the same content, giving you flexibility in organizing your generated files.
+
+> **Note:** When using a file path, remember that `clientImportPath` is relative to the generated file's location, not the directory it's in. Adjust the path accordingly.
+
 Then run `prisma generate` to generate the client and the Effect service.
 
 ### Recommended
