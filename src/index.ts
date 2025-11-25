@@ -82,138 +82,230 @@ function generateModelOperations(models: DMMF.Model[]) {
     .map((model) => {
       const modelName = model.name;
       const modelNameCamel = toCamelCase(modelName);
+      // Type alias for the model delegate (e.g., PrismaClient['user'])
+      const delegate = `PrismaClient['${modelNameCamel}']`;
 
       return `    ${modelNameCamel}: {
-      findUnique: (args: Parameters<PrismaClient['${modelNameCamel}']['findUnique']>[0]) =>
+      findUnique: <A extends Prisma.Args<${delegate}, 'findUnique'>>(
+        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'findUnique'>>
+      ): Effect.Effect<
+        Prisma.Result<${delegate}, A, 'findUnique'>,
+        PrismaFindError,
+        PrismaClientService
+      > =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.findUnique(args),
+            try: () => client.${modelNameCamel}.findUnique(args as any),
             catch: (error) => mapFindError(error, "findUnique", "${modelName}")
           })
         ),
 
-      findUniqueOrThrow: (args: Parameters<PrismaClient['${modelNameCamel}']['findUniqueOrThrow']>[0]) =>
+      findUniqueOrThrow: <A extends Prisma.Args<${delegate}, 'findUniqueOrThrow'>>(
+        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'findUniqueOrThrow'>>
+      ): Effect.Effect<
+        Prisma.Result<${delegate}, A, 'findUniqueOrThrow'>,
+        PrismaFindOrThrowError,
+        PrismaClientService
+      > =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.findUniqueOrThrow(args),
+            try: () => client.${modelNameCamel}.findUniqueOrThrow(args as any),
             catch: (error) => mapFindOrThrowError(error, "findUniqueOrThrow", "${modelName}")
           })
         ),
 
-      findFirst: (args?: Parameters<PrismaClient['${modelNameCamel}']['findFirst']>[0]) =>
+      findFirst: <A extends Prisma.Args<${delegate}, 'findFirst'> = {}>(
+        args?: Prisma.Exact<A, Prisma.Args<${delegate}, 'findFirst'>>
+      ): Effect.Effect<
+        Prisma.Result<${delegate}, A, 'findFirst'>,
+        PrismaFindError,
+        PrismaClientService
+      > =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.findFirst(args),
+            try: () => client.${modelNameCamel}.findFirst(args as any),
             catch: (error) => mapFindError(error, "findFirst", "${modelName}")
           })
         ),
 
-      findFirstOrThrow: (args?: Parameters<PrismaClient['${modelNameCamel}']['findFirstOrThrow']>[0]) =>
+      findFirstOrThrow: <A extends Prisma.Args<${delegate}, 'findFirstOrThrow'> = {}>(
+        args?: Prisma.Exact<A, Prisma.Args<${delegate}, 'findFirstOrThrow'>>
+      ): Effect.Effect<
+        Prisma.Result<${delegate}, A, 'findFirstOrThrow'>,
+        PrismaFindOrThrowError,
+        PrismaClientService
+      > =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.findFirstOrThrow(args),
+            try: () => client.${modelNameCamel}.findFirstOrThrow(args as any),
             catch: (error) => mapFindOrThrowError(error, "findFirstOrThrow", "${modelName}")
           })
         ),
 
-      findMany: (args?: Parameters<PrismaClient['${modelNameCamel}']['findMany']>[0]) =>
+      findMany: <A extends Prisma.Args<${delegate}, 'findMany'> = {}>(
+        args?: Prisma.Exact<A, Prisma.Args<${delegate}, 'findMany'>>
+      ): Effect.Effect<
+        Prisma.Result<${delegate}, A, 'findMany'>,
+        PrismaFindError,
+        PrismaClientService
+      > =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.findMany(args),
+            try: () => client.${modelNameCamel}.findMany(args as any),
             catch: (error) => mapFindError(error, "findMany", "${modelName}")
           })
         ),
 
-      create: (args: Parameters<PrismaClient['${modelNameCamel}']['create']>[0]) =>
+      create: <A extends Prisma.Args<${delegate}, 'create'>>(
+        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'create'>>
+      ): Effect.Effect<
+        Prisma.Result<${delegate}, A, 'create'>,
+        PrismaCreateError,
+        PrismaClientService
+      > =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.create(args),
+            try: () => client.${modelNameCamel}.create(args as any),
             catch: (error) => mapCreateError(error, "create", "${modelName}")
           })
         ),
 
-      createMany: (args?: Parameters<PrismaClient['${modelNameCamel}']['createMany']>[0]) =>
+      createMany: (
+        args?: Prisma.Args<${delegate}, 'createMany'>
+      ): Effect.Effect<Prisma.BatchPayload, PrismaCreateError, PrismaClientService> =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.createMany(args),
+            try: () => client.${modelNameCamel}.createMany(args as any),
             catch: (error) => mapCreateError(error, "createMany", "${modelName}")
           })
         ),
 
-      createManyAndReturn: (args?: Parameters<PrismaClient['${modelNameCamel}']['createManyAndReturn']>[0]) =>
+      createManyAndReturn: <A extends Prisma.Args<${delegate}, 'createManyAndReturn'> = {}>(
+        args?: Prisma.Exact<A, Prisma.Args<${delegate}, 'createManyAndReturn'>>
+      ): Effect.Effect<
+        Prisma.Result<${delegate}, A, 'createManyAndReturn'>,
+        PrismaCreateError,
+        PrismaClientService
+      > =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.createManyAndReturn(args),
+            try: () => client.${modelNameCamel}.createManyAndReturn(args as any),
             catch: (error) => mapCreateError(error, "createManyAndReturn", "${modelName}")
           })
         ),
 
-      delete: (args: Parameters<PrismaClient['${modelNameCamel}']['delete']>[0]) =>
+      delete: <A extends Prisma.Args<${delegate}, 'delete'>>(
+        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'delete'>>
+      ): Effect.Effect<
+        Prisma.Result<${delegate}, A, 'delete'>,
+        PrismaDeleteError,
+        PrismaClientService
+      > =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.delete(args),
+            try: () => client.${modelNameCamel}.delete(args as any),
             catch: (error) => mapDeleteError(error, "delete", "${modelName}")
           })
         ),
 
-      update: (args: Parameters<PrismaClient['${modelNameCamel}']['update']>[0]) =>
+      update: <A extends Prisma.Args<${delegate}, 'update'>>(
+        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'update'>>
+      ): Effect.Effect<
+        Prisma.Result<${delegate}, A, 'update'>,
+        PrismaUpdateError,
+        PrismaClientService
+      > =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.update(args),
+            try: () => client.${modelNameCamel}.update(args as any),
             catch: (error) => mapUpdateError(error, "update", "${modelName}")
           })
         ),
 
-      deleteMany: (args?: Parameters<PrismaClient['${modelNameCamel}']['deleteMany']>[0]) =>
+      deleteMany: (
+        args?: Prisma.Args<${delegate}, 'deleteMany'>
+      ): Effect.Effect<Prisma.BatchPayload, PrismaDeleteManyError, PrismaClientService> =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.deleteMany(args),
+            try: () => client.${modelNameCamel}.deleteMany(args as any),
             catch: (error) => mapDeleteManyError(error, "deleteMany", "${modelName}")
           })
         ),
 
-      updateMany: (args: Parameters<PrismaClient['${modelNameCamel}']['updateMany']>[0]) =>
+      updateMany: (
+        args: Prisma.Args<${delegate}, 'updateMany'>
+      ): Effect.Effect<Prisma.BatchPayload, PrismaUpdateManyError, PrismaClientService> =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.updateMany(args),
+            try: () => client.${modelNameCamel}.updateMany(args as any),
             catch: (error) => mapUpdateManyError(error, "updateMany", "${modelName}")
           })
         ),
 
-      updateManyAndReturn: (args: Parameters<PrismaClient['${modelNameCamel}']['updateManyAndReturn']>[0]) =>
+      updateManyAndReturn: <A extends Prisma.Args<${delegate}, 'updateManyAndReturn'>>(
+        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'updateManyAndReturn'>>
+      ): Effect.Effect<
+        Prisma.Result<${delegate}, A, 'updateManyAndReturn'>,
+        PrismaUpdateManyError,
+        PrismaClientService
+      > =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.updateManyAndReturn(args),
+            try: () => client.${modelNameCamel}.updateManyAndReturn(args as any),
             catch: (error) => mapUpdateManyError(error, "updateManyAndReturn", "${modelName}")
           })
         ),
 
-      upsert: (args: Parameters<PrismaClient['${modelNameCamel}']['upsert']>[0]) =>
+      upsert: <A extends Prisma.Args<${delegate}, 'upsert'>>(
+        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'upsert'>>
+      ): Effect.Effect<
+        Prisma.Result<${delegate}, A, 'upsert'>,
+        PrismaCreateError,
+        PrismaClientService
+      > =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.upsert(args),
+            try: () => client.${modelNameCamel}.upsert(args as any),
             catch: (error) => mapCreateError(error, "upsert", "${modelName}")
           })
         ),
 
       // Aggregation operations
-      count: (args?: Parameters<PrismaClient['${modelNameCamel}']['count']>[0]) =>
+      count: <A extends Prisma.Args<${delegate}, 'count'> = {}>(
+        args?: Prisma.Exact<A, Prisma.Args<${delegate}, 'count'>>
+      ): Effect.Effect<
+        Prisma.Result<${delegate}, A, 'count'>,
+        PrismaFindError,
+        PrismaClientService
+      > =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.count(args),
+            try: () => client.${modelNameCamel}.count(args as any),
             catch: (error) => mapFindError(error, "count", "${modelName}")
           })
         ),
 
-      aggregate: (args: Parameters<PrismaClient['${modelNameCamel}']['aggregate']>[0]) =>
+      aggregate: <A extends Prisma.Args<${delegate}, 'aggregate'>>(
+        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'aggregate'>>
+      ): Effect.Effect<
+        Prisma.Result<${delegate}, A, 'aggregate'>,
+        PrismaFindError,
+        PrismaClientService
+      > =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.aggregate(args),
+            try: () => client.${modelNameCamel}.aggregate(args as any),
             catch: (error) => mapFindError(error, "aggregate", "${modelName}")
           })
         ),
 
-      groupBy: (args: Parameters<PrismaClient['${modelNameCamel}']['groupBy']>[0]) =>
+      groupBy: <A extends Prisma.Args<${delegate}, 'groupBy'>>(
+        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'groupBy'>>
+      ): Effect.Effect<
+        Prisma.Result<${delegate}, A, 'groupBy'>,
+        PrismaFindError,
+        PrismaClientService
+      > =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.groupBy(args as any),
