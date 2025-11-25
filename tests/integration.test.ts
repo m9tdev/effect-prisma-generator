@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Data, Effect, Layer } from "effect";
 import {
   LivePrismaLayer,
@@ -158,6 +158,83 @@ describe("Prisma Effect Generator", () => {
       if (error instanceof MyCustomError) {
         expect(error.message).toBe("boom");
       }
+    }).pipe(Effect.provide(MainLayer)),
+  );
+
+  it.effect("should narrow types with select clause", () =>
+    Effect.gen(function* () {
+      const prisma = yield* PrismaService;
+      const email = `type-test-${Date.now()}@example.com`;
+
+      // Create a user
+      const user = yield* prisma.user.create({
+        data: { email, name: "Type Test User" },
+      });
+
+      // Test type narrowing with select
+      const narrowed = yield* prisma.user.findUnique({
+        where: { id: user.id },
+        select: { id: true },
+      });
+
+      // Type-level assertion: narrowed should only have 'id' property
+      expectTypeOf(narrowed).toEqualTypeOf<{ id: number } | null>();
+
+      // Runtime assertion
+      expect(narrowed).not.toBeNull();
+      expect(narrowed?.id).toBe(user.id);
+      // @ts-expect-error - 'email' should not exist on narrowed type
+      expect(narrowed?.email).toBeUndefined();
+
+      // Test with multiple selected fields
+      const multiSelect = yield* prisma.user.findUnique({
+        where: { id: user.id },
+        select: { id: true, email: true },
+      });
+
+      expectTypeOf(multiSelect).toEqualTypeOf<{ id: number; email: string } | null>();
+
+      // Cleanup
+      yield* prisma.user.delete({ where: { id: user.id } });
+    }).pipe(Effect.provide(MainLayer)),
+  );
+
+  it.effect("should narrow types with findMany select", () =>
+    Effect.gen(function* () {
+      const prisma = yield* PrismaService;
+
+      // Test type narrowing with findMany
+      const users = yield* prisma.user.findMany({
+        select: { email: true },
+      });
+
+      // Type-level assertion: should be array of { email: string }
+      expectTypeOf(users).toEqualTypeOf<{ email: string }[]>();
+    }).pipe(Effect.provide(MainLayer)),
+  );
+
+  it.effect("should return full model when no select", () =>
+    Effect.gen(function* () {
+      const prisma = yield* PrismaService;
+      const email = `full-model-${Date.now()}@example.com`;
+
+      const user = yield* prisma.user.create({
+        data: { email, name: "Full Model User" },
+      });
+
+      const found = yield* prisma.user.findUnique({
+        where: { id: user.id },
+      });
+
+      // Type-level assertion: should have all User fields
+      expectTypeOf(found).toEqualTypeOf<{
+        id: number;
+        email: string;
+        name: string | null;
+      } | null>();
+
+      // Cleanup
+      yield* prisma.user.delete({ where: { id: user.id } });
     }).pipe(Effect.provide(MainLayer)),
   );
 });
