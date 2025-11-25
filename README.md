@@ -305,3 +305,141 @@ This pattern allows you to:
 1. Write self-contained service functions that are safe to call standalone
 2. Compose them in outer transactions for end-to-end atomicity
 3. Functions don't need to know if they're inside another transaction
+
+### Building Effect Services with PrismaService
+
+You can build layered Effect services that wrap `PrismaService`. Transactions work correctly through any level of service composition.
+
+```typescript
+// Level 1: Repository layer
+class UserRepo extends Effect.Service<UserRepo>()("UserRepo", {
+  effect: Effect.gen(function* () {
+    const db = yield* PrismaService;
+    return {
+      create: (email: string, name: string) =>
+        db.user.create({ data: { email, name } }),
+      findById: (id: number) =>
+        db.user.findUnique({ where: { id } }),
+    };
+  }),
+}) {}
+
+class PostRepo extends Effect.Service<PostRepo>()("PostRepo", {
+  effect: Effect.gen(function* () {
+    const db = yield* PrismaService;
+    return {
+      create: (title: string, authorId: number) =>
+        db.post.create({ data: { title, authorId } }),
+    };
+  }),
+}) {}
+
+// Level 2: Domain service composing repositories
+class BlogService extends Effect.Service<BlogService>()("BlogService", {
+  effect: Effect.gen(function* () {
+    const users = yield* UserRepo;
+    const posts = yield* PostRepo;
+    const db = yield* PrismaService;
+
+    return {
+      createAuthorWithPost: (email: string, name: string, title: string) =>
+        db.$transaction(
+          Effect.gen(function* () {
+            const user = yield* users.create(email, name);
+            const post = yield* posts.create(title, user.id);
+            return { user, post };
+          }),
+        ),
+    };
+  }),
+}) {}
+
+// Wire up the layers
+const PrismaLayer = Layer.merge(LivePrismaLayer, PrismaService.Default);
+const RepoLayer = Layer.merge(UserRepo.Default, PostRepo.Default).pipe(
+  Layer.provide(PrismaLayer),
+);
+const ServiceLayer = BlogService.Default.pipe(
+  Layer.provide(RepoLayer),
+  Layer.provide(PrismaLayer),
+);
+
+// Use it
+const program = Effect.gen(function* () {
+  const blog = yield* BlogService;
+  return yield* blog.createAuthorWithPost("alice@example.com", "Alice", "Hello World");
+});
+
+Effect.runPromise(program.pipe(Effect.provide(ServiceLayer)));
+```
+
+#### Why This Works
+
+You might wonder: if `PrismaService` is captured at layer construction time, how do transactions work?
+
+The key is **deferred execution**. When you call `db.user.create({ data })`, it doesn't execute immediately—it returns an **Effect** that describes what to do:
+
+```typescript
+// Generated code (simplified)
+user: {
+  create: (args) => Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+    Effect.tryPromise({ try: () => client.user.create(args), ... })
+  )
+}
+```
+
+The `Effect.flatMap(PrismaClientService, ...)` defers the lookup of `PrismaClientService` until the Effect actually runs. When `$transaction` executes an inner effect, it provides a new `PrismaClientService` with the transaction client:
+
+```typescript
+// Inside $transaction (simplified)
+effect.pipe(Effect.provideService(PrismaClientService, { tx: transactionClient, client }))
+```
+
+So even though you capture `db` (the `PrismaService`) at layer construction, the actual database client lookup happens at execution time—inside the transaction scope.
+
+This means:
+- ✅ Services can store references to `PrismaService` at construction
+- ✅ Services can store effect-returning methods (e.g., `const createUser = db.user.create`)
+- ✅ Transactions work correctly through any number of service layers
+- ✅ Nested `$transaction` calls properly join the outer transaction
+
+### Resource Management
+
+The `makePrismaLayer` function uses `Layer.scoped` with a finalizer to ensure the PrismaClient is properly disconnected when the layer scope ends:
+
+```typescript
+export const makePrismaLayer = <T extends ConstructorParameters<typeof PrismaClient>[0]>(
+  options: T
+) => Layer.scoped(
+  PrismaClientService,
+  Effect.gen(function* () {
+    const prisma = new PrismaClient(options)
+    yield* Effect.addFinalizer(() => Effect.promise(() => prisma.$disconnect()))
+    return { tx: prisma, client: prisma }
+  })
+)
+```
+
+This means:
+- The connection is automatically cleaned up when the program completes
+- The connection is cleaned up even if the program fails
+- Each scoped usage gets its own PrismaClient instance
+
+```typescript
+// Connection is automatically managed
+const program = Effect.gen(function* () {
+  const prisma = yield* PrismaService;
+  yield* prisma.user.findMany();
+  // ... more operations
+});
+
+// $disconnect is called automatically when this completes
+await Effect.runPromise(
+  program.pipe(
+    Effect.provide(Layer.merge(LivePrismaLayer, PrismaService.Default)),
+    Effect.scoped,
+  )
+);
+```
+
+For long-running applications (like servers), you typically provide the layer once at startup and it stays connected for the lifetime of the application.

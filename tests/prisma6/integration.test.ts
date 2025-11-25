@@ -3,6 +3,7 @@ import { Data, Effect, Layer } from "effect";
 import {
   LivePrismaLayer,
   PrismaService,
+  PrismaClientService,
   PrismaUniqueConstraintError,
   PrismaRecordNotFoundError,
   PrismaForeignKeyConstraintError,
@@ -2302,6 +2303,806 @@ describe("Prisma 6 Effect Generator", () => {
         // Cleanup
         yield* prisma.user.delete({ where: { email } });
       }).pipe(Effect.provide(MainLayer)),
+    );
+  });
+
+  // ============================================
+  // Service Layer Composition Tests
+  // Tests for composing Effect services that wrap PrismaService
+  // ============================================
+
+  describe("Service layer composition with transactions", () => {
+    /**
+     * These tests verify that services built on top of PrismaService
+     * correctly participate in transactions at any level of composition.
+     */
+
+    it.effect("single service layer wrapping PrismaService - tx rollback works", () =>
+      Effect.gen(function* () {
+        const prisma = yield* PrismaService;
+        const prefix = `single-layer-${Date.now()}`;
+
+        // A repository service that wraps PrismaService
+        class UserRepo extends Effect.Service<UserRepo>()("UserRepo", {
+          effect: Effect.gen(function* () {
+            const db = yield* PrismaService;
+            return {
+              create: (email: string, name: string) =>
+                db.user.create({ data: { email, name } }),
+              findByEmail: (email: string) =>
+                db.user.findUnique({ where: { email } }),
+            };
+          }),
+        }) {}
+
+        const RepoLayer = Layer.merge(
+          Layer.merge(LivePrismaLayer, PrismaService.Default),
+          UserRepo.Default,
+        );
+
+        // Transaction that fails should rollback
+        const program = prisma.$transaction(
+          Effect.gen(function* () {
+            const repo = yield* UserRepo;
+            yield* repo.create(`${prefix}@example.com`, "Test User");
+            yield* Effect.fail("Intentional failure");
+          }),
+        );
+
+        yield* Effect.flip(program.pipe(Effect.provide(RepoLayer)));
+
+        // User should NOT exist - was rolled back
+        const user = yield* prisma.user.findUnique({
+          where: { email: `${prefix}@example.com` },
+        });
+        expect(user).toBeNull();
+      }).pipe(Effect.provide(MainLayer)),
+    );
+
+    it.effect("two-level service composition - tx rollback works", () =>
+      Effect.gen(function* () {
+        const prisma = yield* PrismaService;
+        const prefix = `two-level-${Date.now()}`;
+
+        // Level 1: Repository services
+        class UserRepo extends Effect.Service<UserRepo>()("UserRepo", {
+          effect: Effect.gen(function* () {
+            const db = yield* PrismaService;
+            return {
+              create: (email: string, name: string) =>
+                db.user.create({ data: { email, name } }),
+            };
+          }),
+        }) {}
+
+        class PostRepo extends Effect.Service<PostRepo>()("PostRepo", {
+          effect: Effect.gen(function* () {
+            const db = yield* PrismaService;
+            return {
+              create: (title: string, authorId: number) =>
+                db.post.create({ data: { title, authorId } }),
+            };
+          }),
+        }) {}
+
+        // Level 2: Domain service composing repositories
+        class BlogService extends Effect.Service<BlogService>()("BlogService", {
+          effect: Effect.gen(function* () {
+            const users = yield* UserRepo;
+            const posts = yield* PostRepo;
+            return {
+              createAuthorWithPost: (email: string, name: string, postTitle: string) =>
+                Effect.gen(function* () {
+                  const user = yield* users.create(email, name);
+                  const post = yield* posts.create(postTitle, user.id);
+                  return { user, post };
+                }),
+            };
+          }),
+        }) {}
+
+        // Build layer with proper dependency order:
+        // BlogService depends on UserRepo + PostRepo, which depend on PrismaService
+        const PrismaLayer = Layer.merge(LivePrismaLayer, PrismaService.Default);
+        const RepoLayer = Layer.merge(UserRepo.Default, PostRepo.Default).pipe(
+          Layer.provide(PrismaLayer),
+        );
+        const ServiceLayer = BlogService.Default.pipe(
+          Layer.provide(RepoLayer),
+          Layer.provide(PrismaLayer),
+        );
+
+        // Transaction wrapping the domain service should rollback both
+        const program = prisma.$transaction(
+          Effect.gen(function* () {
+            const blog = yield* BlogService;
+            yield* blog.createAuthorWithPost(
+              `${prefix}@example.com`,
+              "Author",
+              "First Post",
+            );
+            yield* Effect.fail("Rollback everything");
+          }),
+        );
+
+        yield* Effect.flip(program.pipe(Effect.provide(ServiceLayer)));
+
+        // Both user and post should be rolled back
+        const user = yield* prisma.user.findUnique({
+          where: { email: `${prefix}@example.com` },
+        });
+        expect(user).toBeNull();
+
+        const posts = yield* prisma.post.findMany({
+          where: { title: "First Post" },
+        });
+        expect(posts).toHaveLength(0);
+      }).pipe(Effect.provide(MainLayer)),
+    );
+
+    it.effect("three-level service composition - tx rollback works through all layers", () =>
+      Effect.gen(function* () {
+        const prisma = yield* PrismaService;
+        const prefix = `three-level-${Date.now()}`;
+
+        // Level 1: Repository services (data access)
+        class UserRepo extends Effect.Service<UserRepo>()("UserRepo", {
+          effect: Effect.gen(function* () {
+            const db = yield* PrismaService;
+            return {
+              create: (email: string, name: string) =>
+                db.user.create({ data: { email, name } }),
+              findById: (id: number) =>
+                db.user.findUnique({ where: { id } }),
+            };
+          }),
+        }) {}
+
+        class PostRepo extends Effect.Service<PostRepo>()("PostRepo", {
+          effect: Effect.gen(function* () {
+            const db = yield* PrismaService;
+            return {
+              create: (title: string, content: string | null, authorId: number) =>
+                db.post.create({ data: { title, content, authorId } }),
+              findByAuthor: (authorId: number) =>
+                db.post.findMany({ where: { authorId } }),
+            };
+          }),
+        }) {}
+
+        // Level 2: Domain services (business logic)
+        class AuthorService extends Effect.Service<AuthorService>()("AuthorService", {
+          effect: Effect.gen(function* () {
+            const users = yield* UserRepo;
+            return {
+              register: (email: string, name: string) =>
+                users.create(email, name),
+              getProfile: (id: number) =>
+                users.findById(id),
+            };
+          }),
+        }) {}
+
+        class ContentService extends Effect.Service<ContentService>()("ContentService", {
+          effect: Effect.gen(function* () {
+            const posts = yield* PostRepo;
+            return {
+              publish: (title: string, content: string, authorId: number) =>
+                posts.create(title, content, authorId),
+              getAuthorPosts: (authorId: number) =>
+                posts.findByAuthor(authorId),
+            };
+          }),
+        }) {}
+
+        // Level 3: Application service (orchestration)
+        class OnboardingService extends Effect.Service<OnboardingService>()(
+          "OnboardingService",
+          {
+            effect: Effect.gen(function* () {
+              const authors = yield* AuthorService;
+              const content = yield* ContentService;
+              const db = yield* PrismaService;
+
+              return {
+                // Onboard new author with welcome post - in a transaction
+                onboardAuthor: (email: string, name: string) =>
+                  db.$transaction(
+                    Effect.gen(function* () {
+                      const author = yield* authors.register(email, name);
+                      const welcomePost = yield* content.publish(
+                        "Welcome!",
+                        `Hello, I'm ${name}`,
+                        author.id,
+                      );
+                      return { author, welcomePost };
+                    }),
+                  ),
+
+                // Onboard but fail at the end
+                onboardAndFail: (email: string, name: string) =>
+                  db.$transaction(
+                    Effect.gen(function* () {
+                      const author = yield* authors.register(email, name);
+                      yield* content.publish("Welcome!", `Hello, I'm ${name}`, author.id);
+                      yield* Effect.fail("Simulated onboarding failure");
+                      return author; // never reached
+                    }),
+                  ),
+              };
+            }),
+          },
+        ) {}
+
+        // Build the full layer stack with proper dependencies:
+        // Level 1 (Repos) -> PrismaService
+        // Level 2 (Domain) -> Level 1
+        // Level 3 (App) -> Level 2 + PrismaService
+        const PrismaLayer = Layer.merge(LivePrismaLayer, PrismaService.Default);
+        const Level1 = Layer.merge(UserRepo.Default, PostRepo.Default).pipe(
+          Layer.provide(PrismaLayer),
+        );
+        const Level2 = Layer.merge(AuthorService.Default, ContentService.Default).pipe(
+          Layer.provide(Level1),
+        );
+        const ServiceLayer = OnboardingService.Default.pipe(
+          Layer.provide(Level2),
+          Layer.provide(PrismaLayer),
+        );
+
+        // Test successful onboarding
+        const successProgram = Effect.gen(function* () {
+          const onboarding = yield* OnboardingService;
+          return yield* onboarding.onboardAuthor(`${prefix}-success@example.com`, "Success");
+        });
+
+        const result = yield* successProgram.pipe(Effect.provide(ServiceLayer));
+        expect(result.author.email).toBe(`${prefix}-success@example.com`);
+        expect(result.welcomePost.title).toBe("Welcome!");
+
+        // Test failed onboarding - everything should rollback
+        const failProgram = Effect.gen(function* () {
+          const onboarding = yield* OnboardingService;
+          yield* onboarding.onboardAndFail(`${prefix}-fail@example.com`, "Fail");
+        });
+
+        yield* Effect.flip(failProgram.pipe(Effect.provide(ServiceLayer)));
+
+        // Failed author should NOT exist
+        const failedUser = yield* prisma.user.findUnique({
+          where: { email: `${prefix}-fail@example.com` },
+        });
+        expect(failedUser).toBeNull();
+
+        // Cleanup successful user
+        yield* prisma.post.deleteMany({ where: { authorId: result.author.id } });
+        yield* prisma.user.delete({ where: { id: result.author.id } });
+      }).pipe(Effect.provide(MainLayer)),
+    );
+
+    /**
+     * WHY NESTED TRANSACTIONS WORK:
+     *
+     * When you write:
+     *   class MyRepo extends Effect.Service<MyRepo>()("MyRepo", {
+     *     effect: Effect.gen(function* () {
+     *       const db = yield* PrismaService;  // <-- captured at layer construction
+     *       return {
+     *         create: (data) => db.user.create({ data })  // <-- returns an Effect
+     *       };
+     *     }),
+     *   }) {}
+     *
+     * The key insight is that `db.user.create({ data })` returns an EFFECT, not a value.
+     * Looking at the generated code:
+     *
+     *   user: {
+     *     create: (args) => Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+     *       Effect.tryPromise({ try: () => client.user.create(args), ... })
+     *     )
+     *   }
+     *
+     * The `Effect.flatMap(PrismaClientService, ...)` DEFERS the lookup of PrismaClientService
+     * until the Effect is actually RUN. So even though you capture `db` (the PrismaService)
+     * at layer construction, when you call `db.user.create()`, it returns an Effect that
+     * will look up PrismaClientService fresh when executed.
+     *
+     * When $transaction runs, it does:
+     *   effect.pipe(Effect.provideService(PrismaClientService, { tx, client }))
+     *
+     * This replaces PrismaClientService for all Effects in that scope, so any
+     * `db.user.create()` call will now use the transaction client.
+     */
+    it.effect("nested transactions in composed services", () =>
+      Effect.gen(function* () {
+        const prisma = yield* PrismaService;
+        const prefix = `nested-composed-${Date.now()}`;
+
+        // Repository - captures PrismaService at layer construction
+        class UserRepo extends Effect.Service<UserRepo>()("UserRepo", {
+          effect: Effect.gen(function* () {
+            const db = yield* PrismaService;
+            return {
+              // This returns an Effect that will lookup PrismaClientService when run
+              create: (email: string, name: string) =>
+                db.user.create({ data: { email, name } }),
+            };
+          }),
+        }) {}
+
+        class PostRepo extends Effect.Service<PostRepo>()("PostRepo", {
+          effect: Effect.gen(function* () {
+            const db = yield* PrismaService;
+            return {
+              create: (title: string, authorId: number) =>
+                db.post.create({ data: { title, authorId } }),
+              createMany: (titles: string[], authorId: number) =>
+                Effect.forEach(titles, (title) =>
+                  db.post.create({ data: { title, authorId } }),
+                ),
+            };
+          }),
+        }) {}
+
+        // Service that uses its own transaction internally
+        class BatchPostService extends Effect.Service<BatchPostService>()(
+          "BatchPostService",
+          {
+            effect: Effect.gen(function* () {
+              const posts = yield* PostRepo;
+              const db = yield* PrismaService;
+
+              return {
+                // Creates multiple posts in a transaction
+                createBatch: (titles: string[], authorId: number) =>
+                  db.$transaction(posts.createMany(titles, authorId)),
+              };
+            }),
+          },
+        ) {}
+
+        // Build layer with proper dependencies
+        const PrismaLayer = Layer.merge(LivePrismaLayer, PrismaService.Default);
+        const RepoLayer = Layer.merge(UserRepo.Default, PostRepo.Default).pipe(
+          Layer.provide(PrismaLayer),
+        );
+        const ServiceLayer = BatchPostService.Default.pipe(
+          Layer.provide(RepoLayer),
+          Layer.provide(PrismaLayer),
+        );
+
+        // Outer transaction calling service with inner transaction
+        const program = prisma.$transaction(
+          Effect.gen(function* () {
+            const users = yield* UserRepo;
+            const batchPosts = yield* BatchPostService;
+
+            const user = yield* users.create(`${prefix}@example.com`, "Batch Author");
+
+            // This internally runs its own $transaction, but since we're
+            // already in a tx, it should just use the existing one
+            yield* batchPosts.createBatch(["Post 1", "Post 2", "Post 3"], user.id);
+
+            // Fail to rollback everything
+            yield* Effect.fail("Rollback all");
+          }),
+        );
+
+        yield* Effect.flip(program.pipe(Effect.provide(ServiceLayer)));
+
+        // Everything should be rolled back
+        const user = yield* prisma.user.findUnique({
+          where: { email: `${prefix}@example.com` },
+        });
+        expect(user).toBeNull();
+
+        const posts = yield* prisma.post.findMany({
+          where: { title: { in: ["Post 1", "Post 2", "Post 3"] } },
+        });
+        expect(posts).toHaveLength(0);
+      }).pipe(Effect.provide(MainLayer)),
+    );
+
+    it.effect("service method that returns Effect can be composed in transactions", () =>
+      Effect.gen(function* () {
+        const prisma = yield* PrismaService;
+        const prefix = `composable-${Date.now()}`;
+
+        class UserRepo extends Effect.Service<UserRepo>()("UserRepo", {
+          effect: Effect.gen(function* () {
+            const db = yield* PrismaService;
+            return {
+              create: (email: string, name: string) =>
+                db.user.create({ data: { email, name } }),
+              delete: (id: number) => db.user.delete({ where: { id } }),
+            };
+          }),
+        }) {}
+
+        class PostRepo extends Effect.Service<PostRepo>()("PostRepo", {
+          effect: Effect.gen(function* () {
+            const db = yield* PrismaService;
+            return {
+              create: (title: string, authorId: number) =>
+                db.post.create({ data: { title, authorId } }),
+            };
+          }),
+        }) {}
+
+        const ServiceLayer = Layer.merge(
+          Layer.merge(LivePrismaLayer, PrismaService.Default),
+          Layer.merge(UserRepo.Default, PostRepo.Default),
+        );
+
+        // Compose service methods directly in a transaction
+        const program = prisma.$transaction(
+          Effect.gen(function* () {
+            const users = yield* UserRepo;
+            const posts = yield* PostRepo;
+
+            // Create user
+            const user = yield* users.create(`${prefix}@example.com`, "Composable");
+
+            // Create post for user
+            yield* posts.create("Composed Post", user.id);
+
+            // Delete user (will cascade in real scenario, but here we just test the composition)
+            // Actually, this will fail due to FK constraint, let's just fail manually
+            yield* Effect.fail("Rollback composed operations");
+          }),
+        );
+
+        yield* Effect.flip(program.pipe(Effect.provide(ServiceLayer)));
+
+        // Both should be rolled back
+        const user = yield* prisma.user.findUnique({
+          where: { email: `${prefix}@example.com` },
+        });
+        expect(user).toBeNull();
+      }).pipe(Effect.provide(MainLayer)),
+    );
+
+    it.effect("complex: 4-level deep service with stored effects and delayed execution", () =>
+      Effect.gen(function* () {
+        const prisma = yield* PrismaService;
+        const prefix = `deep-${Date.now()}`;
+
+        // Level 1: Base repo that stores effects in closures
+        class UserRepo extends Effect.Service<UserRepo>()("UserRepo", {
+          effect: Effect.gen(function* () {
+            const db = yield* PrismaService;
+            return {
+              create: (email: string, name: string) =>
+                db.user.create({ data: { email, name } }),
+              // Store an effect factory - the effect is created at call time
+              makeCreator: () => {
+                // Capture db here, but the effect still defers PrismaClientService lookup
+                return (email: string, name: string) =>
+                  db.user.create({ data: { email, name } });
+              },
+            };
+          }),
+        }) {}
+
+        class PostRepo extends Effect.Service<PostRepo>()("PostRepo", {
+          effect: Effect.gen(function* () {
+            const db = yield* PrismaService;
+            return {
+              create: (title: string, authorId: number) =>
+                db.post.create({ data: { title, authorId } }),
+            };
+          }),
+        }) {}
+
+        // Level 2: Domain service that pre-creates effect factories
+        class AuthorDomain extends Effect.Service<AuthorDomain>()("AuthorDomain", {
+          effect: Effect.gen(function* () {
+            const users = yield* UserRepo;
+            const posts = yield* PostRepo;
+
+            // Pre-create the effect factory at layer construction time
+            const createUser = users.makeCreator();
+
+            return {
+              // Use the pre-created factory
+              registerAuthor: (email: string, name: string) => createUser(email, name),
+              addPost: (title: string, authorId: number) => posts.create(title, authorId),
+            };
+          }),
+        }) {}
+
+        // Level 3: Application service that composes domains
+        class BlogApp extends Effect.Service<BlogApp>()("BlogApp", {
+          effect: Effect.gen(function* () {
+            const authorDomain = yield* AuthorDomain;
+            return {
+              onboardWithPost: (email: string, name: string, postTitle: string) =>
+                Effect.gen(function* () {
+                  const author = yield* authorDomain.registerAuthor(email, name);
+                  const post = yield* authorDomain.addPost(postTitle, author.id);
+                  return { author, post };
+                }),
+            };
+          }),
+        }) {}
+
+        // Level 4: Orchestrator that wraps in transaction
+        class Orchestrator extends Effect.Service<Orchestrator>()("Orchestrator", {
+          effect: Effect.gen(function* () {
+            const db = yield* PrismaService;
+            const blogApp = yield* BlogApp;
+            return {
+              safeOnboard: (email: string, name: string, postTitle: string) =>
+                db.$transaction(blogApp.onboardWithPost(email, name, postTitle)),
+            };
+          }),
+        }) {}
+
+        // Build the 4-level layer stack
+        const PrismaLayer = Layer.merge(LivePrismaLayer, PrismaService.Default);
+        const Level1 = Layer.merge(UserRepo.Default, PostRepo.Default).pipe(
+          Layer.provide(PrismaLayer),
+        );
+        const Level2 = AuthorDomain.Default.pipe(Layer.provide(Level1));
+        const Level3 = BlogApp.Default.pipe(Layer.provide(Level2));
+        const Level4 = Orchestrator.Default.pipe(
+          Layer.provide(Level3),
+          Layer.provide(PrismaLayer),
+        );
+
+        // Test 1: Successful transaction through 4 levels
+        const successProgram = Effect.gen(function* () {
+          const orch = yield* Orchestrator;
+          return yield* orch.safeOnboard(
+            `${prefix}-ok@example.com`,
+            "Deep OK",
+            "Deep Post OK",
+          );
+        });
+
+        const okResult = yield* successProgram.pipe(Effect.provide(Level4));
+        expect(okResult.author.email).toBe(`${prefix}-ok@example.com`);
+        expect(okResult.post.title).toBe("Deep Post OK");
+
+        // Test 2: Failed transaction through 4 levels - verify rollback
+        const failProgram = Effect.gen(function* () {
+          const orch = yield* Orchestrator;
+          const db = yield* PrismaService;
+
+          // Wrap orchestrator's transaction in another transaction
+          yield* db.$transaction(
+            Effect.gen(function* () {
+              yield* orch.safeOnboard(
+                `${prefix}-fail@example.com`,
+                "Deep Fail",
+                "Deep Post Fail",
+              );
+              yield* Effect.fail("Outer failure after inner tx");
+            }),
+          );
+        });
+
+        yield* Effect.flip(failProgram.pipe(Effect.provide(Level4)));
+
+        // The inner transaction committed, but outer rolled back
+        // Since nested $transaction just reuses the existing tx when already in one,
+        // the whole thing should be rolled back
+        const failedUser = yield* prisma.user.findUnique({
+          where: { email: `${prefix}-fail@example.com` },
+        });
+        expect(failedUser).toBeNull();
+
+        // Cleanup successful user
+        yield* prisma.post.deleteMany({ where: { authorId: okResult.author.id } });
+        yield* prisma.user.delete({ where: { id: okResult.author.id } });
+      }).pipe(Effect.provide(MainLayer)),
+    );
+
+    it.effect("stored effect references still use correct tx client", () =>
+      Effect.gen(function* () {
+        const prisma = yield* PrismaService;
+        const prefix = `stored-ref-${Date.now()}`;
+
+        // Service that stores effect references at construction
+        class CachingRepo extends Effect.Service<CachingRepo>()("CachingRepo", {
+          effect: Effect.gen(function* () {
+            const db = yield* PrismaService;
+
+            // Store references to effect-returning methods
+            const createUser = db.user.create;
+            const createPost = db.post.create;
+
+            return {
+              // Use the stored references
+              addUser: (email: string, name: string) =>
+                createUser({ data: { email, name } }),
+              addPost: (title: string, authorId: number) =>
+                createPost({ data: { title, authorId } }),
+            };
+          }),
+        }) {}
+
+        const ServiceLayer = CachingRepo.Default.pipe(
+          Layer.provide(Layer.merge(LivePrismaLayer, PrismaService.Default)),
+        );
+
+        // Transaction using stored effect references
+        const program = prisma.$transaction(
+          Effect.gen(function* () {
+            const repo = yield* CachingRepo;
+
+            const user = yield* repo.addUser(`${prefix}@example.com`, "Stored Ref");
+            yield* repo.addPost("Stored Ref Post", user.id);
+
+            yield* Effect.fail("Rollback stored refs");
+          }),
+        );
+
+        yield* Effect.flip(program.pipe(Effect.provide(ServiceLayer)));
+
+        // Both should be rolled back - the stored references still work correctly
+        const user = yield* prisma.user.findUnique({
+          where: { email: `${prefix}@example.com` },
+        });
+        expect(user).toBeNull();
+
+        const posts = yield* prisma.post.findMany({
+          where: { title: "Stored Ref Post" },
+        });
+        expect(posts).toHaveLength(0);
+      }).pipe(Effect.provide(MainLayer)),
+    );
+  });
+
+  // ============================================
+  // Layer Lifecycle Tests
+  // Tests for PrismaClient connection/disconnection
+  // ============================================
+
+  describe("Layer lifecycle", () => {
+    it.effect("$disconnect is called when layer scope ends", () =>
+      Effect.gen(function* () {
+        let disconnectCalled = false;
+
+        // Create a custom layer that tracks disconnect
+        const TrackedPrismaLayer = Layer.scoped(
+          PrismaClientService,
+          Effect.gen(function* () {
+            const { PrismaClient } = yield* Effect.promise(() =>
+              import("./generated/client/index.js"),
+            );
+            const prisma = new PrismaClient();
+
+            // Wrap $disconnect to track when it's called
+            const originalDisconnect = prisma.$disconnect.bind(prisma);
+            prisma.$disconnect = async () => {
+              disconnectCalled = true;
+              return originalDisconnect();
+            };
+
+            yield* Effect.addFinalizer(() =>
+              Effect.promise(() => prisma.$disconnect()),
+            );
+
+            return { tx: prisma, client: prisma };
+          }),
+        );
+
+        const TestLayer = Layer.merge(TrackedPrismaLayer, PrismaService.Default);
+
+        // Run a simple query in a scoped context
+        const program = Effect.gen(function* () {
+          const prisma = yield* PrismaService;
+          yield* prisma.user.findMany();
+          // At this point, disconnect should NOT have been called yet
+          expect(disconnectCalled).toBe(false);
+        });
+
+        // Run with Effect.scoped to properly close the scope
+        yield* program.pipe(Effect.provide(TestLayer), Effect.scoped);
+
+        // After scope ends, disconnect SHOULD have been called
+        expect(disconnectCalled).toBe(true);
+      }),
+    );
+
+    it.effect("$disconnect is called even when effect fails", () =>
+      Effect.gen(function* () {
+        let disconnectCalled = false;
+
+        const TrackedPrismaLayer = Layer.scoped(
+          PrismaClientService,
+          Effect.gen(function* () {
+            const { PrismaClient } = yield* Effect.promise(() =>
+              import("./generated/client/index.js"),
+            );
+            const prisma = new PrismaClient();
+
+            const originalDisconnect = prisma.$disconnect.bind(prisma);
+            prisma.$disconnect = async () => {
+              disconnectCalled = true;
+              return originalDisconnect();
+            };
+
+            yield* Effect.addFinalizer(() =>
+              Effect.promise(() => prisma.$disconnect()),
+            );
+
+            return { tx: prisma, client: prisma };
+          }),
+        );
+
+        const TestLayer = Layer.merge(TrackedPrismaLayer, PrismaService.Default);
+
+        // Run a program that fails
+        const program = Effect.gen(function* () {
+          const prisma = yield* PrismaService;
+          yield* prisma.user.findMany();
+          yield* Effect.fail("Intentional failure");
+        });
+
+        // Run and catch the failure
+        yield* program.pipe(
+          Effect.provide(TestLayer),
+          Effect.scoped,
+          Effect.catchAll(() => Effect.succeed("caught")),
+        );
+
+        // Disconnect should still be called despite the failure
+        expect(disconnectCalled).toBe(true);
+      }),
+    );
+
+    it.effect("multiple scoped usages each get their own connection", () =>
+      Effect.gen(function* () {
+        const disconnectCount = { value: 0 };
+
+        const makeTrackedLayer = () =>
+          Layer.scoped(
+            PrismaClientService,
+            Effect.gen(function* () {
+              const { PrismaClient } = yield* Effect.promise(() =>
+                import("./generated/client/index.js"),
+              );
+              const prisma = new PrismaClient();
+
+              const originalDisconnect = prisma.$disconnect.bind(prisma);
+              prisma.$disconnect = async () => {
+                disconnectCount.value++;
+                return originalDisconnect();
+              };
+
+              yield* Effect.addFinalizer(() =>
+                Effect.promise(() => prisma.$disconnect()),
+              );
+
+              return { tx: prisma, client: prisma };
+            }),
+          );
+
+        // Run two separate scoped effects
+        const program1 = Effect.gen(function* () {
+          const prisma = yield* PrismaService;
+          yield* prisma.user.findMany();
+        }).pipe(
+          Effect.provide(Layer.merge(makeTrackedLayer(), PrismaService.Default)),
+          Effect.scoped,
+        );
+
+        const program2 = Effect.gen(function* () {
+          const prisma = yield* PrismaService;
+          yield* prisma.user.findMany();
+        }).pipe(
+          Effect.provide(Layer.merge(makeTrackedLayer(), PrismaService.Default)),
+          Effect.scoped,
+        );
+
+        yield* program1;
+        expect(disconnectCount.value).toBe(1);
+
+        yield* program2;
+        expect(disconnectCount.value).toBe(2);
+      }),
     );
   });
 });

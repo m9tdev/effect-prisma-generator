@@ -304,6 +304,7 @@ export class PrismaClientService extends Context.Tag("PrismaClientService")<
 
 /**
  * Create a PrismaClientService layer with the given options.
+ * The PrismaClient will be automatically disconnected when the layer scope ends.
  *
  * @example
  * // Prisma 6 with defaults
@@ -315,10 +316,11 @@ export class PrismaClientService extends Context.Tag("PrismaClientService")<
  * // Prisma 7 with adapter (required in v7)
  * const layer = makePrismaLayer({ adapter: myAdapter })
  */
-export const makePrismaLayer = <T extends ConstructorParameters<typeof PrismaClient>[0]>(options: T) => Layer.effect(
+export const makePrismaLayer = <T extends ConstructorParameters<typeof PrismaClient>[0]>(options: T) => Layer.scoped(
   PrismaClientService,
-  Effect.sync(() => {
+  Effect.gen(function* () {
     const prisma = new PrismaClient(options)
+    yield* Effect.addFinalizer(() => Effect.promise(() => prisma.$disconnect()))
     return {
       tx: prisma,
       client: prisma
