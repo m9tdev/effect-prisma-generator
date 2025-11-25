@@ -97,10 +97,15 @@ function generateModelOperations(models: DMMF.Model[], prismaVersion: PrismaVers
 
       // For Prisma 7, we need to cast Promise results to avoid GlobalOmitConfig type conflicts
       // The `as Promise<...>` cast tells TypeScript to trust our return type
+      // For aggregate/groupBy, we need a stronger `as unknown as` cast due to complex internal types
       const promiseCast = (op: string, nullable: boolean = false) => {
         const resultType = `Prisma.Result<${delegate}, A, '${op}'>`;
         const fullType = nullable ? `${resultType} | null` : resultType;
         return prismaVersion === "7" ? ` as Promise<${fullType}>` : "";
+      };
+      const strongPromiseCast = (op: string) => {
+        const resultType = `Prisma.Result<${delegate}, A, '${op}'>`;
+        return prismaVersion === "7" ? ` as unknown as Promise<${resultType}>` : "";
       };
 
       const resultType = (op: string, nullable: boolean = false) => {
@@ -179,8 +184,8 @@ function generateModelOperations(models: DMMF.Model[], prismaVersion: PrismaVers
           })
         ),
 
-      createManyAndReturn: <A extends Prisma.Args<${delegate}, 'createManyAndReturn'> = {}>(
-        args?: Prisma.Exact<A, Prisma.Args<${delegate}, 'createManyAndReturn'>>
+      createManyAndReturn: <A extends Prisma.Args<${delegate}, 'createManyAndReturn'>>(
+        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'createManyAndReturn'>>
       ): Effect.Effect<${resultType('createManyAndReturn')}, PrismaCreateError, PrismaClientService> =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
@@ -265,7 +270,7 @@ function generateModelOperations(models: DMMF.Model[], prismaVersion: PrismaVers
       ): Effect.Effect<${resultType('aggregate')}, PrismaFindError, PrismaClientService> =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.aggregate(args as any)${promiseCast('aggregate')},
+            try: () => client.${modelNameCamel}.aggregate(args as any)${strongPromiseCast('aggregate')},
             catch: (error) => mapFindError(error, "aggregate", "${modelName}")
           })
         ),
@@ -275,7 +280,7 @@ function generateModelOperations(models: DMMF.Model[], prismaVersion: PrismaVers
       ): Effect.Effect<${resultType('groupBy')}, PrismaFindError, PrismaClientService> =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.groupBy(args as any)${promiseCast('groupBy')},
+            try: () => client.${modelNameCamel}.groupBy(args as any)${strongPromiseCast('groupBy')},
             catch: (error) => mapFindError(error, "groupBy", "${modelName}")
           })
         )
@@ -301,7 +306,7 @@ async function generateUnifiedService(
 // Example:
 //   export const LivePrismaLayer = makePrismaLayer({ adapter: myAdapter })
 
-export const makePrismaLayer = (options: Prisma.PrismaClientOptions) => Layer.effect(
+export const makePrismaLayer = <T extends ConstructorParameters<typeof PrismaClient>[0]>(options: T) => Layer.effect(
   PrismaClientService,
   Effect.sync(() => {
     const prisma = new PrismaClient(options)
