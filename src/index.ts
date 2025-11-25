@@ -12,8 +12,6 @@ function toCamelCase(str: string) {
   return str.charAt(0).toLowerCase() + str.slice(1);
 }
 
-// Prisma version affects type generation
-type PrismaVersion = "6" | "7";
 
 generatorHandler({
   onManifest() {
@@ -33,12 +31,6 @@ generatorHandler({
       ? configPath[0]
       : (configPath ?? "@prisma/client");
 
-    // Get Prisma version from config, default to "6" for backward compatibility
-    const prismaVersionConfig = options.generator.config.prismaVersion;
-    const prismaVersion: PrismaVersion = (
-      Array.isArray(prismaVersionConfig) ? prismaVersionConfig[0] : prismaVersionConfig
-    ) === "7" ? "7" : "6";
-
     if (!outputDir) {
       throw new Error("No output directory specified");
     }
@@ -48,7 +40,7 @@ generatorHandler({
     await fs.mkdir(outputDir, { recursive: true });
 
     // Generate unified index file with PrismaService
-    await generateUnifiedService([...models], outputDir, clientImportPath, prismaVersion);
+    await generateUnifiedService([...models], outputDir, clientImportPath);
   },
 });
 
@@ -87,7 +79,7 @@ function generateRawSqlOperations() {
       ),`;
 }
 
-function generateModelOperations(models: DMMF.Model[], prismaVersion: PrismaVersion) {
+function generateModelOperations(models: DMMF.Model[]) {
   return models
     .map((model) => {
       const modelName = model.name;
@@ -95,17 +87,17 @@ function generateModelOperations(models: DMMF.Model[], prismaVersion: PrismaVers
       // Type alias for the model delegate (e.g., PrismaClient['user'])
       const delegate = `PrismaClient['${modelNameCamel}']`;
 
-      // For Prisma 7, we need to cast Promise results to avoid GlobalOmitConfig type conflicts
-      // The `as Promise<...>` cast tells TypeScript to trust our return type
-      // For aggregate/groupBy, we need a stronger `as unknown as` cast due to complex internal types
+      // Cast Promise results to ensure consistent typing across Prisma versions
+      // This handles Prisma 7's GlobalOmitConfig and works fine with Prisma 6 too
       const promiseCast = (op: string, nullable: boolean = false) => {
         const resultType = `Prisma.Result<${delegate}, A, '${op}'>`;
         const fullType = nullable ? `${resultType} | null` : resultType;
-        return prismaVersion === "7" ? ` as Promise<${fullType}>` : "";
+        return ` as Promise<${fullType}>`;
       };
+      // Aggregate/groupBy use complex internal types that need stronger casts
       const strongPromiseCast = (op: string) => {
         const resultType = `Prisma.Result<${delegate}, A, '${op}'>`;
-        return prismaVersion === "7" ? ` as unknown as Promise<${resultType}>` : "";
+        return ` as unknown as Promise<${resultType}>`;
       };
 
       const resultType = (op: string, nullable: boolean = false) => {
@@ -293,41 +285,9 @@ async function generateUnifiedService(
   models: DMMF.Model[],
   outputDir: string,
   clientImportPath: string,
-  prismaVersion: PrismaVersion,
 ) {
   const rawSqlOperations = generateRawSqlOperations();
-  const modelOperations = generateModelOperations(models, prismaVersion);
-
-  // Prisma 7 requires options argument, Prisma 6 allows no arguments
-  // For Prisma 7, we don't generate LivePrismaLayer since it requires adapter config
-  const liveLayerCode = prismaVersion === "7"
-    ? `// Note: Prisma 7 requires explicit adapter/accelerateUrl configuration.
-// Create your own layer using makePrismaLayer with appropriate options.
-// Example:
-//   export const LivePrismaLayer = makePrismaLayer({ adapter: myAdapter })
-
-export const makePrismaLayer = <T extends ConstructorParameters<typeof PrismaClient>[0]>(options: T) => Layer.effect(
-  PrismaClientService,
-  Effect.sync(() => {
-    const prisma = new PrismaClient(options)
-    return {
-      tx: prisma,
-      client: prisma
-    }
-  })
-)`
-    : `export const LivePrismaLayer = Layer.effect(
-  PrismaClientService,
-  Effect.sync(() => {
-    const prisma = new PrismaClient()
-    return {
-      // The \`tx\` property (transaction) can be shared and overridden,
-      // but the \`client\` property must always be a PrismaClient instance.
-      tx: prisma,
-      client: prisma
-    }
-  })
-)`;
+  const modelOperations = generateModelOperations(models);
 
   const serviceContent = `${header}
 import { Cause, Context, Data, Effect, Exit, Layer, Runtime } from "effect"
@@ -342,7 +302,35 @@ export class PrismaClientService extends Context.Tag("PrismaClientService")<
   }
 >() {}
 
-${liveLayerCode}
+/**
+ * Create a PrismaClientService layer with the given options.
+ *
+ * @example
+ * // Prisma 6 with defaults
+ * const layer = makePrismaLayer({})
+ *
+ * // With datasource URL override
+ * const layer = makePrismaLayer({ datasourceUrl: process.env.DATABASE_URL })
+ *
+ * // Prisma 7 with adapter (required in v7)
+ * const layer = makePrismaLayer({ adapter: myAdapter })
+ */
+export const makePrismaLayer = <T extends ConstructorParameters<typeof PrismaClient>[0]>(options: T) => Layer.effect(
+  PrismaClientService,
+  Effect.sync(() => {
+    const prisma = new PrismaClient(options)
+    return {
+      tx: prisma,
+      client: prisma
+    }
+  })
+)
+
+/**
+ * Default layer that creates a PrismaClient with no options.
+ * Works with Prisma 6. For Prisma 7, use makePrismaLayer with adapter/accelerateUrl.
+ */
+export const LivePrismaLayer = makePrismaLayer({} as ConstructorParameters<typeof PrismaClient>[0])
 
 export class PrismaUniqueConstraintError extends Data.TaggedError("PrismaUniqueConstraintError")<{
   cause: Prisma.PrismaClientKnownRequestError
