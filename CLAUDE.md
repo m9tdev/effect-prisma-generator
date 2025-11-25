@@ -1,0 +1,1 @@
+- don't use beads for task tracking in this repo.
