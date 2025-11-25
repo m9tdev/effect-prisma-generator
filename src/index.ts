@@ -17,7 +17,8 @@ generatorHandler({
     return {
       defaultOutput: "../generated/effect",
       prettyName: "Prisma Effect Generator",
-      requiresEngines: ["queryEngine"],
+      // No engines required - we only read the DMMF schema
+      requiresEngines: [],
     };
   },
 
