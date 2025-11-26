@@ -44,9 +44,25 @@ generatorHandler({
       ? errorConfigRaw[0]
       : errorConfigRaw;
 
+    // Import file extension for generated imports (e.g., "js", "ts", or "" for no extension)
+    // Useful for ESM compatibility where imports need explicit extensions
+    const importExtConfigRaw = options.generator.config.importFileExtension;
+    const importFileExtension = Array.isArray(importExtConfigRaw)
+      ? importExtConfigRaw[0]
+      : (importExtConfigRaw ?? "");
+
     if (!outputDir) {
       throw new Error("No output directory specified");
     }
+
+    // Helper to add file extension to a path if configured
+    const addExtension = (filePath: string): string => {
+      if (!importFileExtension) return filePath;
+      // Don't add extension if path already has one
+      const ext = path.extname(filePath);
+      if (ext) return filePath;
+      return `${filePath}.${importFileExtension}`;
+    };
 
     // Convert errorImportPath from schema-relative to output-relative
     let errorImportPath: string | undefined;
@@ -66,7 +82,9 @@ generatorHandler({
         const normalizedPath = relativeToOutput.startsWith(".")
           ? relativeToOutput
           : `./${relativeToOutput}`;
-        errorImportPath = `${normalizedPath}#${className}`;
+        // Add file extension if configured
+        const pathWithExtension = addExtension(normalizedPath);
+        errorImportPath = `${pathWithExtension}#${className}`;
       } else {
         // Package import (e.g., "@myorg/errors#PrismaError"), use as-is
         errorImportPath = errorImportPathRaw;

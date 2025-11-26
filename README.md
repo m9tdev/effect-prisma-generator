@@ -41,6 +41,34 @@ generator effect {
 
 Then run `prisma generate` to generate the client and the Effect service.
 
+### Configuration Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `output` | Output directory for generated code (relative to schema.prisma) | `../generated/effect` |
+| `clientImportPath` | Import path for Prisma Client (relative to output) | `@prisma/client` |
+| `errorImportPath` | Custom error module path (relative to schema.prisma), e.g. `./errors#MyError` | - |
+| `importFileExtension` | File extension for relative imports (`js`, `ts`, or empty) | `""` |
+
+### ESM / Import Extensions
+
+For ESM projects that require explicit file extensions in imports, use `importFileExtension`:
+
+```prisma
+generator effect {
+  provider            = "effect-prisma-generator"
+  output              = "./generated/effect"
+  clientImportPath    = "../client/index.js"
+  errorImportPath     = "./errors#MyPrismaError"  // No extension needed here
+  importFileExtension = "js"                       // Generator adds .js to relative imports
+}
+```
+
+This will generate imports like:
+```typescript
+import { MyPrismaError, mapPrismaError } from "../../errors.js"
+```
+
 ### Recommended
 
 Add the following to your `tsconfig.json`:

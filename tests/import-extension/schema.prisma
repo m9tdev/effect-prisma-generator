@@ -1,0 +1,25 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated/client"
+}
+
+generator effect {
+  provider            = "../../dist/index.js"
+  output              = "./generated/effect"
+  clientImportPath    = "../client/index.js"
+  // errorImportPath WITHOUT extension - the generator should add it
+  errorImportPath     = "./errors#MyPrismaError"
+  // This tells the generator to add .js extension to relative imports
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id    Int     @id @default(autoincrement())
+  email String  @unique
+  name  String?
+}

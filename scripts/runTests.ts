@@ -102,12 +102,36 @@ const runCustomErrorTests = Effect.gen(function* () {
   ),
 );
 
+const runImportExtensionTests = Effect.gen(function* () {
+  yield* Console.log("\n=== Running Import Extension Tests ===\n");
+  const fs = yield* FileSystem.FileSystem;
+
+  // Install deps if needed
+  const nodeModulesExists = yield* fs.exists("tests/import-extension/node_modules");
+  if (!nodeModulesExists) {
+    yield* runInDir("tests/import-extension", "npm", "install");
+  }
+
+  // Push DB schema (also runs generate via schema.prisma config)
+  yield* runInDir("tests/import-extension", "npm", "exec", "prisma", "db", "push");
+
+  // Run tests
+  yield* runInDir("tests/import-extension", "npm", "test");
+}).pipe(
+  Effect.ensuring(
+    process.argv.includes("--keep-db")
+      ? Effect.void
+      : Effect.ignore(run("rm", "-rf", "tests/import-extension/dev.db")),
+  ),
+);
+
 const program = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const clean = process.argv.includes("--clean");
   const prisma7Only = process.argv.includes("--prisma7");
   const prisma6Only = process.argv.includes("--prisma6");
   const customErrorOnly = process.argv.includes("--custom-error");
+  const importExtensionOnly = process.argv.includes("--import-extension");
 
   // Build generator
   const distExists = yield* fs.exists("dist/");
@@ -125,11 +149,14 @@ const program = Effect.gen(function* () {
     yield* runPrisma6Tests;
   } else if (customErrorOnly) {
     yield* runCustomErrorTests;
+  } else if (importExtensionOnly) {
+    yield* runImportExtensionTests;
   } else {
     // Run all
     yield* runPrisma6Tests;
     yield* runPrisma7Tests;
     yield* runCustomErrorTests;
+    yield* runImportExtensionTests;
   }
 });
 
