@@ -46,6 +46,20 @@ const runPrisma6Tests = Effect.gen(function* () {
   // Push DB schema (also runs generate via schema.prisma config)
   yield* runInDir("tests/prisma6", "npm", "exec", "prisma", "db", "push");
 
+  // Type check generated effect files
+  yield* runInDir(
+    "tests/prisma6",
+    "npx",
+    "tsc",
+    "--noEmit",
+    "--strict",
+    "--moduleResolution", "NodeNext",
+    "--module", "NodeNext",
+    "--target", "ES2022",
+    "--skipLibCheck",
+    "generated/effect/index.ts",
+  );
+
   // Run tests
   yield* runInDir("tests/prisma6", "npm", "test");
 }).pipe(
@@ -68,6 +82,20 @@ const runPrisma7Tests = Effect.gen(function* () {
 
   // Push DB schema (also runs generate via schema.prisma config)
   yield* runInDir("tests/prisma7", "npm", "exec", "prisma", "db", "push");
+
+  // Type check generated effect files
+  yield* runInDir(
+    "tests/prisma7",
+    "npx",
+    "tsc",
+    "--noEmit",
+    "--strict",
+    "--moduleResolution", "NodeNext",
+    "--module", "NodeNext",
+    "--target", "ES2022",
+    "--skipLibCheck",
+    "generated/effect/index.ts",
+  );
 
   // Run tests
   yield* runInDir("tests/prisma7", "npm", "test");
@@ -92,6 +120,20 @@ const runCustomErrorTests = Effect.gen(function* () {
   // Push DB schema (also runs generate via schema.prisma config)
   yield* runInDir("tests/custom-error", "npm", "exec", "prisma", "db", "push");
 
+  // Type check generated effect files
+  yield* runInDir(
+    "tests/custom-error",
+    "npx",
+    "tsc",
+    "--noEmit",
+    "--strict",
+    "--moduleResolution", "NodeNext",
+    "--module", "NodeNext",
+    "--target", "ES2022",
+    "--skipLibCheck",
+    "generated/effect/index.ts",
+  );
+
   // Run tests
   yield* runInDir("tests/custom-error", "npm", "test");
 }).pipe(
@@ -114,6 +156,20 @@ const runImportExtensionTests = Effect.gen(function* () {
 
   // Push DB schema (also runs generate via schema.prisma config)
   yield* runInDir("tests/import-extension", "npm", "exec", "prisma", "db", "push");
+
+  // Type check generated effect files
+  yield* runInDir(
+    "tests/import-extension",
+    "npx",
+    "tsc",
+    "--noEmit",
+    "--strict",
+    "--moduleResolution", "NodeNext",
+    "--module", "NodeNext",
+    "--target", "ES2022",
+    "--skipLibCheck",
+    "generated/effect/index.ts",
+  );
 
   // Run tests
   yield* runInDir("tests/import-extension", "npm", "test");
