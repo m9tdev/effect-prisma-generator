@@ -7,7 +7,8 @@ generator effect {
   provider         = "../../dist/index.js"
   output           = "./generated/effect"
   clientImportPath = "../client/index.js"
-  errorImportPath  = "../../errors.js#MyPrismaError"
+  // errorImportPath is relative to this schema.prisma file, NOT the output directory
+  errorImportPath  = "./errors.js#MyPrismaError"
 }
 
 datasource db {

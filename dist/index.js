@@ -24,22 +24,45 @@ function toCamelCase(str) {
     async onGenerate(options) {
         const models = options.dmmf.datamodel.models;
         const outputDir = options.generator.output?.value;
+        const schemaDir = node_path_1.default.dirname(options.schemaPath);
         const configPath = options.generator.config.clientImportPath;
         const clientImportPath = Array.isArray(configPath)
             ? configPath[0]
             : (configPath ?? "@prisma/client");
         // Custom error configuration: "path/to/module#ErrorClassName"
-        // e.g., "./errors#PrismaError" or "@myorg/errors#MyPrismaError"
+        // Path is relative to schema.prisma, e.g., "./errors#PrismaError"
         // The module must export:
         //   - The error class (e.g., `export class PrismaError extends ...`)
         //   - A mapper function named `mapPrismaError` with signature:
         //     `(error: unknown, operation: string, model: string) => YourErrorType`
         const errorConfigRaw = options.generator.config.errorImportPath;
-        const errorImportPath = Array.isArray(errorConfigRaw)
+        const errorImportPathRaw = Array.isArray(errorConfigRaw)
             ? errorConfigRaw[0]
             : errorConfigRaw;
         if (!outputDir) {
             throw new Error("No output directory specified");
+        }
+        // Convert errorImportPath from schema-relative to output-relative
+        let errorImportPath;
+        if (errorImportPathRaw) {
+            const [modulePath, className] = errorImportPathRaw.split("#");
+            if (!modulePath || !className) {
+                throw new Error(`Invalid errorImportPath format: "${errorImportPathRaw}". Expected "path/to/module#ErrorClassName"`);
+            }
+            // If it's a relative path, convert from schema-relative to output-relative
+            if (modulePath.startsWith(".")) {
+                const absoluteErrorPath = node_path_1.default.resolve(schemaDir, modulePath);
+                const relativeToOutput = node_path_1.default.relative(outputDir, absoluteErrorPath);
+                // Ensure it starts with ./ or ../
+                const normalizedPath = relativeToOutput.startsWith(".")
+                    ? relativeToOutput
+                    : `./${relativeToOutput}`;
+                errorImportPath = `${normalizedPath}#${className}`;
+            }
+            else {
+                // Package import (e.g., "@myorg/errors#PrismaError"), use as-is
+                errorImportPath = errorImportPathRaw;
+            }
         }
         // Clean output directory
         await promises_1.default.rm(outputDir, { recursive: true, force: true });

@@ -179,9 +179,11 @@ generator effect {
   provider         = "effect-prisma-generator"
   output           = "./generated/effect"
   clientImportPath = "../client"
-  errorImportPath  = "./errors#MyPrismaError"  // path/to/module#ClassName
+  errorImportPath  = "./errors#MyPrismaError"  // relative to schema.prisma
 }
 ```
+
+> **Note:** The `errorImportPath` is relative to your `schema.prisma` file location, not the output directory. The generator automatically calculates the correct import path for the generated code.
 
 Your error module must export:
 1. **The error class** - Your custom error type
