@@ -1,0 +1,13 @@
+# Exclude test directories from npm/pnpm installation
+tests/
+scripts/
+
+# Exclude development files
+*.tsbuildinfo
+.DS_Store
+tsconfig.json
+CLAUDE.md
+.gitignore
+
+# Exclude source (only ship dist)
+src/
