@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.5.0] (2025-11-26)
+
+### BREAKING CHANGES
+
+* **transactions:** Transactions now run in the same fiber as the parent effect instead of spawning a new fiber via `Runtime.runPromiseExit`. This fixes issues where `FiberRef` modifications (like `HttpApiBuilder.securitySetCookie`) inside transactions were lost. If you relied on fiber isolation in transactions, this is a breaking change.
+
+### Features
+
+* **transactions:** Callback-free transaction implementation using `Effect.acquireUseRelease` - modifications to `FiberRef`, `Ref`, and service state inside transactions are now visible to the parent effect
+* **transactions:** Add `transactionOptions` to layer config for default isolation level
+* **config:** Add `importFileExtension` option for ESM compatibility (e.g., `.js` extensions in imports)
+* **config:** Add `errorImportPath` for custom error class mapping
+* **api:** Add `Prisma.layer`, `Prisma.layerEffect`, and `Prisma.Live` for improved ergonomics
+* **types:** Add comprehensive type tests for select/include narrowing
+
+### Bug Fixes
+
+* **config:** Make `errorImportPath` relative to schema.prisma location, not output directory
+* **layers:** Fix layer composition in nested transaction tests using `Layer.provideMerge`
+* **compat:** Improve Prisma 6/7 compatibility (no version config needed)
+
 ## [0.4.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.3.3...v0.4.0) (2025-11-20)
 
 
