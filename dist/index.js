@@ -626,6 +626,58 @@ export class Prisma extends Service<Prisma>()("Prisma", {
             )
           }
         ),
+
+      /**
+       * Execute an effect in a NEW transaction, even if already inside a transaction.
+       * Unlike \`$transaction\`, this always creates a fresh, independent transaction.
+       *
+       * Use this for operations that should NOT be rolled back with the parent:
+       * - Audit logging that must persist even if main operation fails
+       * - Saga pattern where each step has independent commit/rollback
+       * - Background job queuing that should commit immediately
+       *
+       * ⚠️ WARNING: The isolated transaction can commit while the parent rolls back,
+       * or vice versa. Use carefully to avoid data inconsistencies.
+       *
+       * @example
+       * yield* prisma.$transaction(
+       *   Effect.gen(function* () {
+       *     // This audit log commits independently - survives parent rollback
+       *     yield* prisma.$isolatedTransaction(
+       *       prisma.auditLog.create({ data: { action: "attempt", userId } })
+       *     )
+       *     // Main operation - if this fails, audit log is still committed
+       *     yield* prisma.user.delete({ where: { id: userId } })
+       *   })
+       * )
+       */
+      $isolatedTransaction: <R, E, A>(
+        effect: Effect.Effect<A, E, R>,
+        options?: TransactionOptions
+      ) =>
+        Effect.flatMap(
+          PrismaClient,
+          ({ client, transactionOptions }): Effect.Effect<A, E | ${customError.className}, R> => {
+            // Always use the root client to create a fresh transaction
+            const mergedOptions = { ...transactionOptions, ...options }
+
+            return Effect.acquireUseRelease(
+              $begin(client, mergedOptions),
+              (txClient) =>
+                effect.pipe(
+                  Effect.provideService(PrismaClient, {
+                    tx: txClient,
+                    client,
+                    transactionOptions,
+                  })
+                ),
+              (txClient, exit) =>
+                Exit.isSuccess(exit)
+                  ? Effect.promise(() => txClient.$commit())
+                  : Effect.promise(() => txClient.$rollback())
+            )
+          }
+        ),
       ${rawSqlOperations}
 
       ${modelOperations}
@@ -1333,6 +1385,58 @@ export class Prisma extends Service<Prisma>()("Prisma", {
                 ),
 
               // Release: commit on success, rollback on failure/interruption
+              (txClient, exit) =>
+                Exit.isSuccess(exit)
+                  ? Effect.promise(() => txClient.$commit())
+                  : Effect.promise(() => txClient.$rollback())
+            )
+          }
+        ),
+
+      /**
+       * Execute an effect in a NEW transaction, even if already inside a transaction.
+       * Unlike \`$transaction\`, this always creates a fresh, independent transaction.
+       *
+       * Use this for operations that should NOT be rolled back with the parent:
+       * - Audit logging that must persist even if main operation fails
+       * - Saga pattern where each step has independent commit/rollback
+       * - Background job queuing that should commit immediately
+       *
+       * ⚠️ WARNING: The isolated transaction can commit while the parent rolls back,
+       * or vice versa. Use carefully to avoid data inconsistencies.
+       *
+       * @example
+       * yield* prisma.$transaction(
+       *   Effect.gen(function* () {
+       *     // This audit log commits independently - survives parent rollback
+       *     yield* prisma.$isolatedTransaction(
+       *       prisma.auditLog.create({ data: { action: "attempt", userId } })
+       *     )
+       *     // Main operation - if this fails, audit log is still committed
+       *     yield* prisma.user.delete({ where: { id: userId } })
+       *   })
+       * )
+       */
+      $isolatedTransaction: <R, E, A>(
+        effect: Effect.Effect<A, E, R>,
+        options?: TransactionOptions
+      ) =>
+        Effect.flatMap(
+          PrismaClient,
+          ({ client, transactionOptions }): Effect.Effect<A, E | PrismaError, R> => {
+            // Always use the root client to create a fresh transaction
+            const mergedOptions = { ...transactionOptions, ...options }
+
+            return Effect.acquireUseRelease(
+              $begin(client, mergedOptions),
+              (txClient) =>
+                effect.pipe(
+                  Effect.provideService(PrismaClient, {
+                    tx: txClient,
+                    client,
+                    transactionOptions,
+                  })
+                ),
               (txClient, exit) =>
                 Exit.isSuccess(exit)
                   ? Effect.promise(() => txClient.$commit())
