@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import { Data, Effect, Layer } from "effect";
+import { Context, Data, Effect, Layer, Ref } from "effect";
 import {
   LivePrismaLayer,
   PrismaService,
@@ -2018,6 +2018,184 @@ describe("Prisma 6 Effect Generator", () => {
         yield* prisma.user.deleteMany({
           where: { email: { startsWith: prefix } },
         });
+      }).pipe(Effect.provide(MainLayer)),
+    );
+
+    it.effect("should preserve Ref modifications from inside transaction", () =>
+      Effect.gen(function* () {
+        const prisma = yield* PrismaService;
+        const prefix = `tx-ref-${Date.now()}`;
+
+        // Create a Ref to track operations
+        const operationLog = yield* Ref.make<string[]>([]);
+
+        // Run a transaction that modifies the Ref
+        const result = yield* prisma.$transaction(
+          Effect.gen(function* () {
+            yield* Ref.update(operationLog, (log) => [...log, "tx-start"]);
+
+            const user = yield* prisma.user.create({
+              data: { email: `${prefix}@example.com`, name: "Ref Test" },
+            });
+
+            yield* Ref.update(operationLog, (log) => [...log, "user-created"]);
+
+            yield* prisma.post.create({
+              data: { title: "Ref Post", authorId: user.id },
+            });
+
+            yield* Ref.update(operationLog, (log) => [...log, "post-created"]);
+
+            return user;
+          }),
+        );
+
+        // After transaction, Ref modifications should be visible
+        yield* Ref.update(operationLog, (log) => [...log, "tx-complete"]);
+        const finalLog = yield* Ref.get(operationLog);
+
+        // All operations should be logged (this proves same-fiber execution)
+        expect(finalLog).toEqual([
+          "tx-start",
+          "user-created",
+          "post-created",
+          "tx-complete",
+        ]);
+
+        // Verify the transaction committed
+        const user = yield* prisma.user.findUnique({
+          where: { id: result.id },
+          include: { posts: true },
+        });
+        expect(user?.posts).toHaveLength(1);
+
+        // Cleanup
+        yield* prisma.post.deleteMany({ where: { authorId: result.id } });
+        yield* prisma.user.delete({ where: { id: result.id } });
+      }).pipe(Effect.provide(MainLayer)),
+    );
+
+    it.effect("should preserve Ref modifications even on transaction failure", () =>
+      Effect.gen(function* () {
+        const prisma = yield* PrismaService;
+        const prefix = `tx-ref-fail-${Date.now()}`;
+
+        // Create a Ref to track operations
+        const operationLog = yield* Ref.make<string[]>([]);
+
+        // Run a transaction that modifies the Ref and then fails
+        const program = prisma.$transaction(
+          Effect.gen(function* () {
+            yield* Ref.update(operationLog, (log) => [...log, "tx-start"]);
+
+            yield* prisma.user.create({
+              data: { email: `${prefix}@example.com`, name: "Will Rollback" },
+            });
+
+            yield* Ref.update(operationLog, (log) => [...log, "user-created"]);
+
+            // Fail the transaction
+            yield* Effect.fail("Intentional failure");
+          }),
+        );
+
+        yield* Effect.flip(program);
+
+        // After failed transaction, Ref modifications should STILL be visible
+        // (because we run in the same fiber, not a separate runtime)
+        yield* Ref.update(operationLog, (log) => [...log, "tx-failed"]);
+        const finalLog = yield* Ref.get(operationLog);
+
+        // All operations including the ones before failure should be logged
+        expect(finalLog).toEqual([
+          "tx-start",
+          "user-created",
+          "tx-failed",
+        ]);
+
+        // Verify the database was rolled back (user should not exist)
+        const user = yield* prisma.user.findFirst({
+          where: { email: `${prefix}@example.com` },
+        });
+        expect(user).toBeNull();
+      }).pipe(Effect.provide(MainLayer)),
+    );
+
+    it.effect("should allow modifying service state from inside transaction", () =>
+      Effect.gen(function* () {
+        const prisma = yield* PrismaService;
+        const prefix = `tx-service-${Date.now()}`;
+
+        // A service that tracks audit logs - simulating a real-world use case
+        // where you want to record what happened during a transaction
+        class AuditLog extends Context.Tag("AuditLog")<
+          AuditLog,
+          { readonly entries: Ref.Ref<string[]> }
+        >() {}
+
+        const AuditLogLive = Layer.effect(
+          AuditLog,
+          Effect.gen(function* () {
+            const entries = yield* Ref.make<string[]>([]);
+            return { entries };
+          }),
+        );
+
+        const program = Effect.gen(function* () {
+          // Get the service OUTSIDE the transaction
+          const auditOutside = yield* AuditLog;
+
+          // Add an entry before the transaction
+          yield* Ref.update(auditOutside.entries, (e) => [...e, "before-tx"]);
+
+          // Run a transaction that gets the service INSIDE and modifies it
+          const result = yield* prisma.$transaction(
+            Effect.gen(function* () {
+              // Get the service INSIDE the transaction - this is the key test!
+              // With the old runPromiseExit implementation, this would have been
+              // a different instance or would have failed
+              const auditInside = yield* AuditLog;
+
+              yield* Ref.update(auditInside.entries, (e) => [...e, "tx-start"]);
+
+              const user = yield* prisma.user.create({
+                data: { email: `${prefix}@example.com`, name: "Audit Test" },
+              });
+
+              yield* Ref.update(auditInside.entries, (e) => [
+                ...e,
+                `created-user-${user.id}`,
+              ]);
+
+              return user;
+            }),
+          );
+
+          // Add an entry after the transaction (using service obtained outside)
+          yield* Ref.update(auditOutside.entries, (e) => [...e, "after-tx"]);
+
+          // Get the final audit log
+          const finalLog = yield* Ref.get(auditOutside.entries);
+
+          return { user: result, auditLog: finalLog };
+        });
+
+        const { user, auditLog } = yield* program.pipe(
+          Effect.provide(AuditLogLive),
+        );
+
+        // The audit log should have all entries in order
+        // This proves the service obtained INSIDE the transaction shares state
+        // with the service obtained OUTSIDE the transaction
+        expect(auditLog).toEqual([
+          "before-tx",
+          "tx-start",
+          `created-user-${user.id}`,
+          "after-tx",
+        ]);
+
+        // Cleanup
+        yield* prisma.user.delete({ where: { id: user.id } });
       }).pipe(Effect.provide(MainLayer)),
     );
   });
