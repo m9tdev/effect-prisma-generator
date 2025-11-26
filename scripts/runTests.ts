@@ -36,7 +36,6 @@ const runInDir = (dir: string, cmd: string, ...args: string[]) =>
 const runPrisma6Tests = Effect.gen(function* () {
   yield* Console.log("\n=== Running Prisma 6 Tests ===\n");
   const fs = yield* FileSystem.FileSystem;
-  const clean = process.argv.includes("--clean");
 
   // Install deps if needed
   const nodeModulesExists = yield* fs.exists("tests/prisma6/node_modules");
@@ -44,17 +43,11 @@ const runPrisma6Tests = Effect.gen(function* () {
     yield* runInDir("tests/prisma6", "npm", "install");
   }
 
-  // Push DB schema
-  const dbExists = yield* fs.exists("tests/prisma6/dev.db");
-  if (clean || !dbExists) {
-    yield* runInDir("tests/prisma6", "npx", "prisma", "db", "push");
-  }
-
-  // Generate Prisma client and Effect wrapper
-  yield* runInDir("tests/prisma6", "npx", "prisma", "generate");
+  // Push DB schema (also runs generate via schema.prisma config)
+  yield* runInDir("tests/prisma6", "npm", "exec", "prisma", "db", "push");
 
   // Run tests
-  yield* runInDir("tests/prisma6", "npx", "vitest", "run");
+  yield* runInDir("tests/prisma6", "npm", "test");
 }).pipe(
   Effect.ensuring(
     process.argv.includes("--keep-db")
@@ -66,7 +59,6 @@ const runPrisma6Tests = Effect.gen(function* () {
 const runPrisma7Tests = Effect.gen(function* () {
   yield* Console.log("\n=== Running Prisma 7 Tests ===\n");
   const fs = yield* FileSystem.FileSystem;
-  const clean = process.argv.includes("--clean");
 
   // Install deps if needed
   const nodeModulesExists = yield* fs.exists("tests/prisma7/node_modules");
@@ -74,17 +66,11 @@ const runPrisma7Tests = Effect.gen(function* () {
     yield* runInDir("tests/prisma7", "npm", "install");
   }
 
-  // Push DB schema
-  const dbExists = yield* fs.exists("tests/prisma7/dev.db");
-  if (clean || !dbExists) {
-    yield* runInDir("tests/prisma7", "npx", "prisma", "db", "push");
-  }
-
-  // Generate Prisma client and Effect wrapper
-  yield* runInDir("tests/prisma7", "npx", "prisma", "generate");
+  // Push DB schema (also runs generate via schema.prisma config)
+  yield* runInDir("tests/prisma7", "npm", "exec", "prisma", "db", "push");
 
   // Run tests
-  yield* runInDir("tests/prisma7", "npx", "vitest", "run");
+  yield* runInDir("tests/prisma7", "npm", "test");
 }).pipe(
   Effect.ensuring(
     process.argv.includes("--keep-db")
@@ -93,11 +79,35 @@ const runPrisma7Tests = Effect.gen(function* () {
   ),
 );
 
+const runCustomErrorTests = Effect.gen(function* () {
+  yield* Console.log("\n=== Running Custom Error Tests ===\n");
+  const fs = yield* FileSystem.FileSystem;
+
+  // Install deps if needed
+  const nodeModulesExists = yield* fs.exists("tests/custom-error/node_modules");
+  if (!nodeModulesExists) {
+    yield* runInDir("tests/custom-error", "npm", "install");
+  }
+
+  // Push DB schema (also runs generate via schema.prisma config)
+  yield* runInDir("tests/custom-error", "npm", "exec", "prisma", "db", "push");
+
+  // Run tests
+  yield* runInDir("tests/custom-error", "npm", "test");
+}).pipe(
+  Effect.ensuring(
+    process.argv.includes("--keep-db")
+      ? Effect.void
+      : Effect.ignore(run("rm", "-rf", "tests/custom-error/dev.db")),
+  ),
+);
+
 const program = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const clean = process.argv.includes("--clean");
   const prisma7Only = process.argv.includes("--prisma7");
   const prisma6Only = process.argv.includes("--prisma6");
+  const customErrorOnly = process.argv.includes("--custom-error");
 
   // Build generator
   const distExists = yield* fs.exists("dist/");
@@ -113,10 +123,13 @@ const program = Effect.gen(function* () {
     yield* runPrisma7Tests;
   } else if (prisma6Only) {
     yield* runPrisma6Tests;
+  } else if (customErrorOnly) {
+    yield* runCustomErrorTests;
   } else {
-    // Run both
+    // Run all
     yield* runPrisma6Tests;
     yield* runPrisma7Tests;
+    yield* runCustomErrorTests;
   }
 });
 

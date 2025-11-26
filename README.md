@@ -160,7 +160,88 @@ const program = Effect.gen(function* () {
 | `PrismaUniqueConstraintError` | P2002 | Duplicate unique field |
 | `PrismaRecordNotFoundError` | P2025 | `findUniqueOrThrow`, `findFirstOrThrow`, `update`, `delete` on non-existent |
 | `PrismaForeignKeyConstraintError` | P2003 | Invalid foreign key reference |
-| `PrismaError` | * | All other Prisma errors |
+| `PrismaValueTooLongError` | P2000 | Value exceeds column length |
+| `PrismaDbConstraintError` | P2004 | Database constraint violation |
+| `PrismaInputValidationError` | P2005, P2006, P2019 | Invalid input value |
+| `PrismaMissingRequiredValueError` | P2011, P2012 | Required field is null |
+| `PrismaRelationViolationError` | P2014 | Relation constraint violation |
+| `PrismaRelatedRecordNotFoundError` | P2015, P2018 | Related record not found |
+| `PrismaValueOutOfRangeError` | P2020 | Value out of range |
+| `PrismaConnectionError` | P2024 | Connection pool timeout |
+| `PrismaTransactionConflictError` | P2034 | Transaction conflict (retry) |
+
+### Custom Error Mapping
+
+If you want to use your own error type instead of the built-in tagged errors, you can configure `errorImportPath` in your schema:
+
+```prisma
+generator effect {
+  provider         = "effect-prisma-generator"
+  output           = "./generated/effect"
+  clientImportPath = "../client"
+  errorImportPath  = "./errors#MyPrismaError"  // path/to/module#ClassName
+}
+```
+
+Your error module must export:
+1. **The error class** - Your custom error type
+2. **A mapper function** named `mapPrismaError` - Maps raw errors to your type
+
+```typescript
+// errors.ts
+import { Data } from "effect";
+import { Prisma } from "@prisma/client";
+
+export class MyPrismaError extends Data.TaggedError("MyPrismaError")<{
+  cause: unknown;
+  operation: string;
+  model: string;
+  code?: string;  // You can add custom fields
+}> {}
+
+export const mapPrismaError = (
+  error: unknown,
+  operation: string,
+  model: string
+): MyPrismaError => {
+  // You can inspect the error and add custom handling
+  const code = error instanceof Prisma.PrismaClientKnownRequestError
+    ? error.code
+    : undefined;
+
+  // Option: throw unknown errors as defects
+  // if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+  //   throw error;
+  // }
+
+  return new MyPrismaError({ cause: error, operation, model, code });
+};
+```
+
+Now all operations will use your `MyPrismaError` type:
+
+```typescript
+import { PrismaService, MyPrismaError } from "./generated/effect";
+
+const program = Effect.gen(function* () {
+  const prisma = yield* PrismaService;
+
+  // All errors are now MyPrismaError
+  yield* prisma.user
+    .create({ data: { email: "alice@example.com" } })
+    .pipe(
+      Effect.catchTag("MyPrismaError", (error) => {
+        console.log(`Operation: ${error.operation}, Code: ${error.code}`);
+        return Effect.succeed(null);
+      }),
+    );
+});
+```
+
+This is useful when:
+- Migrating from an existing codebase that uses a single error type
+- You want to add custom fields/metadata to errors
+- You want control over which errors are recoverable vs defects
 
 ### Transactions
 

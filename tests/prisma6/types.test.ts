@@ -316,6 +316,186 @@ describe("Type-level tests", () => {
       }).pipe(Effect.provide(MainLayer)),
     );
 
+    // Test case for nested select with variable (reproduces issue with type inference)
+    it.effect("select with nested relation using variable for nested select", () =>
+      Effect.gen(function* () {
+        const prisma = yield* PrismaService;
+
+        // Define a reusable select object for User fields
+        const selectAuthor = {
+          id: true,
+          email: true,
+        } as const;
+
+        const result = yield* prisma.post.findUnique({
+          where: { id: 1 },
+          select: {
+            id: true,
+            title: true,
+            author: {
+              select: selectAuthor,
+            },
+          },
+        });
+
+        // The nested author should include the selected fields
+        expectTypeOf(result).toEqualTypeOf<{
+          id: number;
+          title: string;
+          author: {
+            id: number;
+            email: string;
+          };
+        } | null>();
+      }).pipe(Effect.provide(MainLayer)),
+    );
+
+    // More complex: nested select with relation that has its own nested select
+    it.effect("deeply nested select with variables", () =>
+      Effect.gen(function* () {
+        const prisma = yield* PrismaService;
+
+        const selectPost = {
+          id: true,
+          title: true,
+        } as const;
+
+        const selectAuthorWithPosts = {
+          id: true,
+          email: true,
+          posts: {
+            select: selectPost,
+          },
+        } as const;
+
+        const result = yield* prisma.post.findUnique({
+          where: { id: 1 },
+          select: {
+            id: true,
+            author: {
+              select: selectAuthorWithPosts,
+            },
+          },
+        });
+
+        expectTypeOf(result).toEqualTypeOf<{
+          id: number;
+          author: {
+            id: number;
+            email: string;
+            posts: Array<{
+              id: number;
+              title: string;
+            }>;
+          };
+        } | null>();
+      }).pipe(Effect.provide(MainLayer)),
+    );
+
+    // Test using Schema.Single pattern (reproduces issue from Chefy repo)
+    it("nested select result should be assignable to expected type (type-only)", () => {
+      // This simulates the pattern:
+      // const prismaResult = yield* prisma.session.findUnique({...select with nested user...})
+      // Schema.single(SomeValidator).make(prismaResult)
+      //
+      // The issue is that nested relations are missing from the inferred result type
+
+      const _typeCheck = (prisma: Effect.Effect.Success<typeof PrismaService>) => {
+        // Define expected result type
+        type ExpectedPostWithAuthor = {
+          id: number;
+          title: string;
+          author: {
+            id: number;
+            email: string;
+          };
+        };
+
+        // Define select object as const
+        const selectAuthor = {
+          id: true,
+          email: true,
+        } as const;
+
+        const effect = prisma.post.findUnique({
+          where: { id: 1 },
+          select: {
+            id: true,
+            title: true,
+            author: {
+              select: selectAuthor,
+            },
+          },
+        });
+
+        // Get the success type
+        type ActualResult = Effect.Effect.Success<typeof effect>;
+        type NonNullResult = NonNullable<ActualResult>;
+
+        // This should be assignable - if it errors, the types are wrong
+        const _checkAssignable: NonNullResult = {} as ExpectedPostWithAuthor;
+
+        // Verify author is present in the type
+        type HasAuthor = NonNullResult extends { author: infer A } ? A : never;
+        expectTypeOf<HasAuthor>().toEqualTypeOf<{ id: number; email: string }>();
+      };
+    });
+
+    // Test WITHOUT as const - this might fail due to type widening
+    it("nested select WITHOUT as const should still infer correctly (type-only)", () => {
+      const _typeCheck = (prisma: Effect.Effect.Success<typeof PrismaService>) => {
+        // Define select WITHOUT as const - this is the problematic pattern
+        // TypeScript may widen { id: true } to { id: boolean }
+        const selectAuthor = {
+          id: true,
+          email: true,
+        }; // No `as const`!
+
+        const effect = prisma.post.findUnique({
+          where: { id: 1 },
+          select: {
+            id: true,
+            title: true,
+            author: {
+              select: selectAuthor,
+            },
+          },
+        });
+
+        // Get the success type
+        type ActualResult = Effect.Effect.Success<typeof effect>;
+        type NonNullResult = NonNullable<ActualResult>;
+
+        // Verify author is still present in the type (this is what might fail)
+        type HasAuthor = NonNullResult extends { author: infer A } ? A : never;
+
+        // If this fails, the nested select inference is broken without `as const`
+        expectTypeOf<HasAuthor>().not.toBeNever();
+      };
+    });
+
+    // Test with Prisma.validator pattern (recommended by Prisma docs)
+    it("nested select using Prisma.validator should infer correctly (type-only)", () => {
+      // Import Prisma namespace for validator
+      const _typeCheck = async () => {
+        // This pattern is documented by Prisma for reusable queries
+        // https://www.prisma.io/docs/concepts/components/prisma-client/advanced-type-safety/operating-against-partial-structures-of-model-types
+
+        const { Prisma } = await import("../prisma6/generated/client/index.js");
+        const { PrismaService } = await import("../prisma6/generated/effect/index.js");
+
+        // Using Prisma.validator ensures proper type inference
+        const selectAuthor = Prisma.validator<Prisma.UserSelect>()({
+          id: true,
+          email: true,
+        });
+
+        // Type check that this pattern would work
+        type SelectAuthorType = typeof selectAuthor;
+        expectTypeOf<SelectAuthorType>().toMatchTypeOf<{ id: true; email: true }>();
+      };
+    });
+
     it.effect("select: false excludes field (full relation selection)", () =>
       Effect.gen(function* () {
         const prisma = yield* PrismaService;

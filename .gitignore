@@ -6,4 +6,6 @@ tests/prisma6/generated
 tests/prisma6/node_modules
 tests/prisma7/generated
 tests/prisma7/node_modules
+tests/custom-error/generated
+tests/custom-error/node_modules
 *.db
