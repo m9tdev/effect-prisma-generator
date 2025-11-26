@@ -90,32 +90,32 @@ function generateRawSqlOperations(customError: CustomErrorConfig) {
   const errorType = customError ? customError.className : "PrismaError";
 
   return `
-    $executeRaw: (args: Prisma.Sql | [Prisma.Sql, ...any[]]): Effect.Effect<number, ${errorType}, PrismaClientService> =>
-      Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+    $executeRaw: (args: PrismaNamespace.Sql | [PrismaNamespace.Sql, ...any[]]): Effect.Effect<number, ${errorType}, PrismaClient> =>
+      Effect.flatMap(PrismaClient, ({ tx: client }) =>
         Effect.tryPromise({
           try: () => (Array.isArray(args) ? client.$executeRaw(args[0], ...args.slice(1)) : client.$executeRaw(args)),
           catch: (error) => mapError(error, "$executeRaw", "Prisma")
         })
       ),
 
-    $executeRawUnsafe: (query: string, ...values: any[]): Effect.Effect<number, ${errorType}, PrismaClientService> =>
-      Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+    $executeRawUnsafe: (query: string, ...values: any[]): Effect.Effect<number, ${errorType}, PrismaClient> =>
+      Effect.flatMap(PrismaClient, ({ tx: client }) =>
         Effect.tryPromise({
           try: () => client.$executeRawUnsafe(query, ...values),
           catch: (error) => mapError(error, "$executeRawUnsafe", "Prisma")
         })
       ),
 
-    $queryRaw: <T = unknown>(args: Prisma.Sql | [Prisma.Sql, ...any[]]): Effect.Effect<T, ${errorType}, PrismaClientService> =>
-      Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+    $queryRaw: <T = unknown>(args: PrismaNamespace.Sql | [PrismaNamespace.Sql, ...any[]]): Effect.Effect<T, ${errorType}, PrismaClient> =>
+      Effect.flatMap(PrismaClient, ({ tx: client }) =>
         Effect.tryPromise({
           try: () => (Array.isArray(args) ? client.$queryRaw(args[0], ...args.slice(1)) : client.$queryRaw(args)) as Promise<T>,
           catch: (error) => mapError(error, "$queryRaw", "Prisma")
         })
       ),
 
-    $queryRawUnsafe: <T = unknown>(query: string, ...values: any[]): Effect.Effect<T, ${errorType}, PrismaClientService> =>
-      Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+    $queryRawUnsafe: <T = unknown>(query: string, ...values: any[]): Effect.Effect<T, ${errorType}, PrismaClient> =>
+      Effect.flatMap(PrismaClient, ({ tx: client }) =>
         Effect.tryPromise({
           try: () => client.$queryRawUnsafe(query, ...values) as Promise<T>,
           catch: (error) => mapError(error, "$queryRawUnsafe", "Prisma")
@@ -128,24 +128,24 @@ function generateModelOperations(models: DMMF.Model[], customError: CustomErrorC
     .map((model) => {
       const modelName = model.name;
       const modelNameCamel = toCamelCase(modelName);
-      // Type alias for the model delegate (e.g., PrismaClient['user'])
-      const delegate = `PrismaClient['${modelNameCamel}']`;
+      // Type alias for the model delegate (e.g., BasePrismaClient['user'])
+      const delegate = `BasePrismaClient['${modelNameCamel}']`;
 
       // Cast Promise results to ensure consistent typing across Prisma versions
       // This handles Prisma 7's GlobalOmitConfig and works fine with Prisma 6 too
       const promiseCast = (op: string, nullable: boolean = false) => {
-        const resultType = `Prisma.Result<${delegate}, A, '${op}'>`;
+        const resultType = `PrismaNamespace.Result<${delegate}, A, '${op}'>`;
         const fullType = nullable ? `${resultType} | null` : resultType;
         return ` as Promise<${fullType}>`;
       };
       // Aggregate/groupBy use complex internal types that need stronger casts
       const strongPromiseCast = (op: string) => {
-        const resultType = `Prisma.Result<${delegate}, A, '${op}'>`;
+        const resultType = `PrismaNamespace.Result<${delegate}, A, '${op}'>`;
         return ` as unknown as Promise<${resultType}>`;
       };
 
       const resultType = (op: string, nullable: boolean = false) => {
-        const baseType = `Prisma.Result<${delegate}, A, '${op}'>`;
+        const baseType = `PrismaNamespace.Result<${delegate}, A, '${op}'>`;
         return nullable ? `${baseType} | null` : baseType;
       };
 
@@ -157,60 +157,60 @@ function generateModelOperations(models: DMMF.Model[], customError: CustomErrorC
         customError ? "mapError" : defaultMapper;
 
       return `    ${modelNameCamel}: {
-      findUnique: <A extends Prisma.Args<${delegate}, 'findUnique'>>(
-        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'findUnique'>>
-      ): Effect.Effect<${resultType('findUnique', true)}, ${errorType('PrismaFindError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+      findUnique: <A extends PrismaNamespace.Args<${delegate}, 'findUnique'>>(
+        args: PrismaNamespace.Exact<A, PrismaNamespace.Args<${delegate}, 'findUnique'>>
+      ): Effect.Effect<${resultType('findUnique', true)}, ${errorType('PrismaFindError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.findUnique(args as any)${promiseCast('findUnique', true)},
             catch: (error) => ${mapperFn('mapFindError')}(error, "findUnique", "${modelName}")
           })
         ),
 
-      findUniqueOrThrow: <A extends Prisma.Args<${delegate}, 'findUniqueOrThrow'>>(
-        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'findUniqueOrThrow'>>
-      ): Effect.Effect<${resultType('findUniqueOrThrow')}, ${errorType('PrismaFindOrThrowError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+      findUniqueOrThrow: <A extends PrismaNamespace.Args<${delegate}, 'findUniqueOrThrow'>>(
+        args: PrismaNamespace.Exact<A, PrismaNamespace.Args<${delegate}, 'findUniqueOrThrow'>>
+      ): Effect.Effect<${resultType('findUniqueOrThrow')}, ${errorType('PrismaFindOrThrowError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.findUniqueOrThrow(args as any)${promiseCast('findUniqueOrThrow')},
             catch: (error) => ${mapperFn('mapFindOrThrowError')}(error, "findUniqueOrThrow", "${modelName}")
           })
         ),
 
-      findFirst: <A extends Prisma.Args<${delegate}, 'findFirst'> = {}>(
-        args?: Prisma.Exact<A, Prisma.Args<${delegate}, 'findFirst'>>
-      ): Effect.Effect<${resultType('findFirst', true)}, ${errorType('PrismaFindError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+      findFirst: <A extends PrismaNamespace.Args<${delegate}, 'findFirst'> = {}>(
+        args?: PrismaNamespace.Exact<A, PrismaNamespace.Args<${delegate}, 'findFirst'>>
+      ): Effect.Effect<${resultType('findFirst', true)}, ${errorType('PrismaFindError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.findFirst(args as any)${promiseCast('findFirst', true)},
             catch: (error) => ${mapperFn('mapFindError')}(error, "findFirst", "${modelName}")
           })
         ),
 
-      findFirstOrThrow: <A extends Prisma.Args<${delegate}, 'findFirstOrThrow'> = {}>(
-        args?: Prisma.Exact<A, Prisma.Args<${delegate}, 'findFirstOrThrow'>>
-      ): Effect.Effect<${resultType('findFirstOrThrow')}, ${errorType('PrismaFindOrThrowError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+      findFirstOrThrow: <A extends PrismaNamespace.Args<${delegate}, 'findFirstOrThrow'> = {}>(
+        args?: PrismaNamespace.Exact<A, PrismaNamespace.Args<${delegate}, 'findFirstOrThrow'>>
+      ): Effect.Effect<${resultType('findFirstOrThrow')}, ${errorType('PrismaFindOrThrowError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.findFirstOrThrow(args as any)${promiseCast('findFirstOrThrow')},
             catch: (error) => ${mapperFn('mapFindOrThrowError')}(error, "findFirstOrThrow", "${modelName}")
           })
         ),
 
-      findMany: <A extends Prisma.Args<${delegate}, 'findMany'> = {}>(
-        args?: Prisma.Exact<A, Prisma.Args<${delegate}, 'findMany'>>
-      ): Effect.Effect<${resultType('findMany')}, ${errorType('PrismaFindError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+      findMany: <A extends PrismaNamespace.Args<${delegate}, 'findMany'> = {}>(
+        args?: PrismaNamespace.Exact<A, PrismaNamespace.Args<${delegate}, 'findMany'>>
+      ): Effect.Effect<${resultType('findMany')}, ${errorType('PrismaFindError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.findMany(args as any)${promiseCast('findMany')},
             catch: (error) => ${mapperFn('mapFindError')}(error, "findMany", "${modelName}")
           })
         ),
 
-      create: <A extends Prisma.Args<${delegate}, 'create'>>(
-        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'create'>>
-      ): Effect.Effect<${resultType('create')}, ${errorType('PrismaCreateError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+      create: <A extends PrismaNamespace.Args<${delegate}, 'create'>>(
+        args: PrismaNamespace.Exact<A, PrismaNamespace.Args<${delegate}, 'create'>>
+      ): Effect.Effect<${resultType('create')}, ${errorType('PrismaCreateError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.create(args as any)${promiseCast('create')},
             catch: (error) => ${mapperFn('mapCreateError')}(error, "create", "${modelName}")
@@ -218,39 +218,39 @@ function generateModelOperations(models: DMMF.Model[], customError: CustomErrorC
         ),
 
       createMany: (
-        args?: Prisma.Args<${delegate}, 'createMany'>
-      ): Effect.Effect<Prisma.BatchPayload, ${errorType('PrismaCreateError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+        args?: PrismaNamespace.Args<${delegate}, 'createMany'>
+      ): Effect.Effect<PrismaNamespace.BatchPayload, ${errorType('PrismaCreateError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.createMany(args as any),
             catch: (error) => ${mapperFn('mapCreateError')}(error, "createMany", "${modelName}")
           })
         ),
 
-      createManyAndReturn: <A extends Prisma.Args<${delegate}, 'createManyAndReturn'>>(
-        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'createManyAndReturn'>>
-      ): Effect.Effect<${resultType('createManyAndReturn')}, ${errorType('PrismaCreateError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+      createManyAndReturn: <A extends PrismaNamespace.Args<${delegate}, 'createManyAndReturn'>>(
+        args: PrismaNamespace.Exact<A, PrismaNamespace.Args<${delegate}, 'createManyAndReturn'>>
+      ): Effect.Effect<${resultType('createManyAndReturn')}, ${errorType('PrismaCreateError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.createManyAndReturn(args as any)${promiseCast('createManyAndReturn')},
             catch: (error) => ${mapperFn('mapCreateError')}(error, "createManyAndReturn", "${modelName}")
           })
         ),
 
-      delete: <A extends Prisma.Args<${delegate}, 'delete'>>(
-        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'delete'>>
-      ): Effect.Effect<${resultType('delete')}, ${errorType('PrismaDeleteError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+      delete: <A extends PrismaNamespace.Args<${delegate}, 'delete'>>(
+        args: PrismaNamespace.Exact<A, PrismaNamespace.Args<${delegate}, 'delete'>>
+      ): Effect.Effect<${resultType('delete')}, ${errorType('PrismaDeleteError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.delete(args as any)${promiseCast('delete')},
             catch: (error) => ${mapperFn('mapDeleteError')}(error, "delete", "${modelName}")
           })
         ),
 
-      update: <A extends Prisma.Args<${delegate}, 'update'>>(
-        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'update'>>
-      ): Effect.Effect<${resultType('update')}, ${errorType('PrismaUpdateError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+      update: <A extends PrismaNamespace.Args<${delegate}, 'update'>>(
+        args: PrismaNamespace.Exact<A, PrismaNamespace.Args<${delegate}, 'update'>>
+      ): Effect.Effect<${resultType('update')}, ${errorType('PrismaUpdateError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.update(args as any)${promiseCast('update')},
             catch: (error) => ${mapperFn('mapUpdateError')}(error, "update", "${modelName}")
@@ -258,9 +258,9 @@ function generateModelOperations(models: DMMF.Model[], customError: CustomErrorC
         ),
 
       deleteMany: (
-        args?: Prisma.Args<${delegate}, 'deleteMany'>
-      ): Effect.Effect<Prisma.BatchPayload, ${errorType('PrismaDeleteManyError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+        args?: PrismaNamespace.Args<${delegate}, 'deleteMany'>
+      ): Effect.Effect<PrismaNamespace.BatchPayload, ${errorType('PrismaDeleteManyError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.deleteMany(args as any),
             catch: (error) => ${mapperFn('mapDeleteManyError')}(error, "deleteMany", "${modelName}")
@@ -268,29 +268,29 @@ function generateModelOperations(models: DMMF.Model[], customError: CustomErrorC
         ),
 
       updateMany: (
-        args: Prisma.Args<${delegate}, 'updateMany'>
-      ): Effect.Effect<Prisma.BatchPayload, ${errorType('PrismaUpdateManyError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+        args: PrismaNamespace.Args<${delegate}, 'updateMany'>
+      ): Effect.Effect<PrismaNamespace.BatchPayload, ${errorType('PrismaUpdateManyError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.updateMany(args as any),
             catch: (error) => ${mapperFn('mapUpdateManyError')}(error, "updateMany", "${modelName}")
           })
         ),
 
-      updateManyAndReturn: <A extends Prisma.Args<${delegate}, 'updateManyAndReturn'>>(
-        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'updateManyAndReturn'>>
-      ): Effect.Effect<${resultType('updateManyAndReturn')}, ${errorType('PrismaUpdateManyError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+      updateManyAndReturn: <A extends PrismaNamespace.Args<${delegate}, 'updateManyAndReturn'>>(
+        args: PrismaNamespace.Exact<A, PrismaNamespace.Args<${delegate}, 'updateManyAndReturn'>>
+      ): Effect.Effect<${resultType('updateManyAndReturn')}, ${errorType('PrismaUpdateManyError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.updateManyAndReturn(args as any)${promiseCast('updateManyAndReturn')},
             catch: (error) => ${mapperFn('mapUpdateManyError')}(error, "updateManyAndReturn", "${modelName}")
           })
         ),
 
-      upsert: <A extends Prisma.Args<${delegate}, 'upsert'>>(
-        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'upsert'>>
-      ): Effect.Effect<${resultType('upsert')}, ${errorType('PrismaCreateError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+      upsert: <A extends PrismaNamespace.Args<${delegate}, 'upsert'>>(
+        args: PrismaNamespace.Exact<A, PrismaNamespace.Args<${delegate}, 'upsert'>>
+      ): Effect.Effect<${resultType('upsert')}, ${errorType('PrismaCreateError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.upsert(args as any)${promiseCast('upsert')},
             catch: (error) => ${mapperFn('mapCreateError')}(error, "upsert", "${modelName}")
@@ -298,30 +298,30 @@ function generateModelOperations(models: DMMF.Model[], customError: CustomErrorC
         ),
 
       // Aggregation operations
-      count: <A extends Prisma.Args<${delegate}, 'count'> = {}>(
-        args?: Prisma.Exact<A, Prisma.Args<${delegate}, 'count'>>
-      ): Effect.Effect<${resultType('count')}, ${errorType('PrismaFindError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+      count: <A extends PrismaNamespace.Args<${delegate}, 'count'> = {}>(
+        args?: PrismaNamespace.Exact<A, PrismaNamespace.Args<${delegate}, 'count'>>
+      ): Effect.Effect<${resultType('count')}, ${errorType('PrismaFindError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.count(args as any)${promiseCast('count')},
             catch: (error) => ${mapperFn('mapFindError')}(error, "count", "${modelName}")
           })
         ),
 
-      aggregate: <A extends Prisma.Args<${delegate}, 'aggregate'>>(
-        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'aggregate'>>
-      ): Effect.Effect<${resultType('aggregate')}, ${errorType('PrismaFindError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+      aggregate: <A extends PrismaNamespace.Args<${delegate}, 'aggregate'>>(
+        args: PrismaNamespace.Exact<A, PrismaNamespace.Args<${delegate}, 'aggregate'>>
+      ): Effect.Effect<${resultType('aggregate')}, ${errorType('PrismaFindError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.aggregate(args as any)${strongPromiseCast('aggregate')},
             catch: (error) => ${mapperFn('mapFindError')}(error, "aggregate", "${modelName}")
           })
         ),
 
-      groupBy: <A extends Prisma.Args<${delegate}, 'groupBy'>>(
-        args: Prisma.Exact<A, Prisma.Args<${delegate}, 'groupBy'>>
-      ): Effect.Effect<${resultType('groupBy')}, ${errorType('PrismaFindError')}, PrismaClientService> =>
-        Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+      groupBy: <A extends PrismaNamespace.Args<${delegate}, 'groupBy'>>(
+        args: PrismaNamespace.Exact<A, PrismaNamespace.Args<${delegate}, 'groupBy'>>
+      ): Effect.Effect<${resultType('groupBy')}, ${errorType('PrismaFindError')}, PrismaClient> =>
+        Effect.flatMap(PrismaClient, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.groupBy(args as any)${strongPromiseCast('groupBy')},
             catch: (error) => ${mapperFn('mapFindError')}(error, "groupBy", "${modelName}")
@@ -375,48 +375,105 @@ function generateCustomErrorService(
   return `${header}
 import { Cause, Context, Effect, Exit, Layer, Runtime } from "effect"
 import { Service } from "effect/Effect"
-import { Prisma, PrismaClient } from "${clientImportPath}"
+import { Prisma as PrismaNamespace, PrismaClient as BasePrismaClient } from "${clientImportPath}"
 import { ${customError.className}, mapPrismaError } from "${customError.path}"
 
-export class PrismaClientService extends Context.Tag("PrismaClientService")<
-  PrismaClientService,
-  {
-    tx: PrismaClient | Prisma.TransactionClient
-    client: PrismaClient
-  }
->() {}
-
 /**
- * Create a PrismaClientService layer with the given options.
- * The PrismaClient will be automatically disconnected when the layer scope ends.
+ * Context tag for the Prisma client instance.
+ * Holds both the transaction client (tx) and the root client.
+ *
+ * Use \`PrismaClient.layer()\` or \`PrismaClient.layerEffect()\` to create a layer.
  *
  * @example
- * // Prisma 6 with defaults
- * const layer = makePrismaLayer({})
+ * // Create a layer with options
+ * const layer = PrismaClient.layer({ datasourceUrl: "..." })
  *
- * // With datasource URL override
- * const layer = makePrismaLayer({ datasourceUrl: process.env.DATABASE_URL })
- *
- * // Prisma 7 with adapter (required in v7)
- * const layer = makePrismaLayer({ adapter: myAdapter })
+ * // Create a layer with effectful options (e.g., for adapters)
+ * const layer = PrismaClient.layerEffect(
+ *   Effect.gen(function* () {
+ *     const config = yield* ConfigService
+ *     return { datasourceUrl: config.databaseUrl }
+ *   })
+ * )
  */
-export const makePrismaLayer = <T extends ConstructorParameters<typeof PrismaClient>[0]>(options: T) => Layer.scoped(
-  PrismaClientService,
-  Effect.gen(function* () {
-    const prisma = new PrismaClient(options)
-    yield* Effect.addFinalizer(() => Effect.promise(() => prisma.$disconnect()))
-    return {
-      tx: prisma,
-      client: prisma
-    }
-  })
-)
+export class PrismaClient extends Context.Tag("PrismaClient")<
+  PrismaClient,
+  {
+    tx: BasePrismaClient | PrismaNamespace.TransactionClient
+    client: BasePrismaClient
+  }
+>() {
+  /**
+   * Create a PrismaClient layer with the given options.
+   * The client will be automatically disconnected when the layer scope ends.
+   *
+   * @example
+   * // Prisma 6 with defaults
+   * const layer = PrismaClient.layer({})
+   *
+   * // With datasource URL override
+   * const layer = PrismaClient.layer({ datasourceUrl: process.env.DATABASE_URL })
+   *
+   * // Prisma 7 with adapter (required in v7)
+   * const layer = PrismaClient.layer({ adapter: myAdapter })
+   */
+  static layer = <T extends ConstructorParameters<typeof BasePrismaClient>[0]>(options: T) => Layer.scoped(
+    PrismaClient,
+    Effect.gen(function* () {
+      const prisma = new BasePrismaClient(options)
+      yield* Effect.addFinalizer(() => Effect.promise(() => prisma.$disconnect()))
+      return {
+        tx: prisma,
+        client: prisma
+      }
+    })
+  )
 
-/**
- * Default layer that creates a PrismaClient with no options.
- * Works with Prisma 6. For Prisma 7, use makePrismaLayer with adapter/accelerateUrl.
- */
-export const LivePrismaLayer = makePrismaLayer({} as ConstructorParameters<typeof PrismaClient>[0])
+  /**
+   * Create a PrismaClient layer where options are computed via an Effect.
+   * Useful when you need to fetch configuration from environment, config service, or create adapters.
+   * The client will be automatically disconnected when the layer scope ends.
+   *
+   * @example
+   * // Get datasource URL from Config service
+   * const layer = PrismaClient.layerEffect(
+   *   Effect.gen(function* () {
+   *     const config = yield* ConfigService
+   *     return { datasourceUrl: config.databaseUrl }
+   *   })
+   * )
+   *
+   * @example
+   * // Create adapter using Effect
+   * const layer = PrismaClient.layerEffect(
+   *   Effect.gen(function* () {
+   *     const pool = yield* PostgresPool
+   *     const adapter = yield* Effect.sync(() => PrismaNeon(pool))
+   *     return { adapter }
+   *   })
+   * )
+   */
+  static layerEffect = <R, E, T extends ConstructorParameters<typeof BasePrismaClient>[0]>(
+    optionsEffect: Effect.Effect<T, E, R>
+  ) => Layer.scoped(
+    PrismaClient,
+    Effect.gen(function* () {
+      const options = yield* optionsEffect
+      const prisma = new BasePrismaClient(options)
+      yield* Effect.addFinalizer(() => Effect.promise(() => prisma.$disconnect()))
+      return {
+        tx: prisma,
+        client: prisma
+      }
+    })
+  )
+
+  /**
+   * Default layer that creates a PrismaClient with no options.
+   * Works with Prisma 6. For Prisma 7, use PrismaClient.layer() with adapter/accelerateUrl.
+   */
+  static Default = PrismaClient.layer({} as ConstructorParameters<typeof BasePrismaClient>[0])
+}
 
 // Re-export the custom error type for convenience
 export { ${customError.className} }
@@ -424,7 +481,24 @@ export { ${customError.className} }
 // Use the user-provided error mapper
 const mapError = mapPrismaError
 
-export class PrismaService extends Service<PrismaService>()("PrismaService", {
+/**
+ * The main Prisma service with all database operations.
+ * Provides type-safe, effectful access to your Prisma models.
+ *
+ * @example
+ * const program = Effect.gen(function* () {
+ *   const prisma = yield* Prisma
+ *   const user = yield* prisma.user.create({ data: { name: "Alice" } })
+ *   return user
+ * })
+ *
+ * // Run with default layer (Prisma 6)
+ * Effect.runPromise(program.pipe(Effect.provide(Prisma.Live)))
+ *
+ * // Or with custom options
+ * Effect.runPromise(program.pipe(Effect.provide(Prisma.layer({ datasourceUrl: "..." }))))
+ */
+export class Prisma extends Service<Prisma>()("Prisma", {
   effect: Effect.gen(function* () {
     return {
       $transaction: <R, E, A>(
@@ -432,11 +506,11 @@ export class PrismaService extends Service<PrismaService>()("PrismaService", {
         options?: {
           maxWait?: number
           timeout?: number
-          isolationLevel?: Prisma.TransactionIsolationLevel
+          isolationLevel?: PrismaNamespace.TransactionIsolationLevel
         }
       ) =>
         Effect.flatMap(
-          Effect.all([PrismaClientService, Effect.runtime<R>()]),
+          Effect.all([PrismaClient, Effect.runtime<R>()]),
           ([{ client, tx }, runtime]): Effect.Effect<A, E | ${customError.className}, R> => {
             const isRootClient = "$transaction" in tx;
             if (!isRootClient) {
@@ -447,7 +521,7 @@ export class PrismaService extends Service<PrismaService>()("PrismaService", {
                 client.$transaction(async (tx) => {
                   const exit = await Runtime.runPromiseExit(runtime)(
                     effect.pipe(
-                      Effect.provideService(PrismaClientService, {
+                      Effect.provideService(PrismaClient, {
                         tx,
                         client,
                       }),
@@ -467,7 +541,92 @@ export class PrismaService extends Service<PrismaService>()("PrismaService", {
       ${modelOperations}
     }
   })
-}) {}
+}) {
+  /**
+   * Create a complete Prisma layer with the given PrismaClient options.
+   * This is the recommended way to create a Prisma layer - it bundles both
+   * PrismaClient and Prisma service together.
+   *
+   * @example
+   * // Prisma 6 with defaults
+   * const MainLayer = Prisma.layer({})
+   *
+   * // With datasource URL override
+   * const MainLayer = Prisma.layer({ datasourceUrl: process.env.DATABASE_URL })
+   *
+   * // Prisma 7 with adapter
+   * const MainLayer = Prisma.layer({ adapter: myAdapter })
+   *
+   * // Use it
+   * Effect.runPromise(program.pipe(Effect.provide(MainLayer)))
+   */
+  static layer = <T extends ConstructorParameters<typeof BasePrismaClient>[0]>(options: T) =>
+    Layer.merge(PrismaClient.layer(options), Prisma.Default)
+
+  /**
+   * Create a complete Prisma layer where PrismaClient options are computed via an Effect.
+   * This is useful when you need to fetch configuration or create adapters using Effect.
+   *
+   * @example
+   * // Get datasource URL from Config service
+   * const MainLayer = Prisma.layerEffect(
+   *   Effect.gen(function* () {
+   *     const config = yield* ConfigService
+   *     return { datasourceUrl: config.databaseUrl }
+   *   })
+   * )
+   *
+   * // Create adapter using Effect
+   * const MainLayer = Prisma.layerEffect(
+   *   Effect.gen(function* () {
+   *     const pool = yield* PostgresPool
+   *     const adapter = yield* Effect.sync(() => PrismaNeon(pool))
+   *     return { adapter }
+   *   })
+   * )
+   */
+  static layerEffect = <R, E, T extends ConstructorParameters<typeof BasePrismaClient>[0]>(
+    optionsEffect: Effect.Effect<T, E, R>
+  ) => Layer.merge(PrismaClient.layerEffect(optionsEffect), Prisma.Default)
+
+  /**
+   * Complete default layer with both PrismaClient and Prisma service.
+   * Works with Prisma 6. For Prisma 7, use Prisma.layer() with adapter.
+   *
+   * @example
+   * Effect.runPromise(program.pipe(Effect.provide(Prisma.Live)))
+   */
+  static Live = Layer.merge(PrismaClient.Default, Prisma.Default)
+}
+
+// ============================================================================
+// Deprecated aliases for backward compatibility
+// ============================================================================
+
+/**
+ * @deprecated Use \`PrismaClient\` instead. Will be removed in next major version.
+ */
+export const PrismaClientService = PrismaClient
+
+/**
+ * @deprecated Use \`Prisma\` instead. Will be removed in next major version.
+ */
+export const PrismaService = Prisma
+
+/**
+ * @deprecated Use \`PrismaClient.layer()\` instead. Will be removed in next major version.
+ */
+export const makePrismaLayer = PrismaClient.layer
+
+/**
+ * @deprecated Use \`PrismaClient.layerEffect()\` instead. Will be removed in next major version.
+ */
+export const makePrismaLayerEffect = PrismaClient.layerEffect
+
+/**
+ * @deprecated Use \`PrismaClient.Default\` instead. Will be removed in next major version.
+ */
+export const LivePrismaLayer = PrismaClient.Default
 `;
 }
 
@@ -483,116 +642,173 @@ function generateDefaultErrorService(
   return `${header}
 import { Cause, Context, Data, Effect, Exit, Layer, Runtime } from "effect"
 import { Service } from "effect/Effect"
-import { Prisma, PrismaClient } from "${clientImportPath}"
-
-export class PrismaClientService extends Context.Tag("PrismaClientService")<
-  PrismaClientService,
-  {
-    tx: PrismaClient | Prisma.TransactionClient
-    client: PrismaClient
-  }
->() {}
+import { Prisma as PrismaNamespace, PrismaClient as BasePrismaClient } from "${clientImportPath}"
 
 /**
- * Create a PrismaClientService layer with the given options.
- * The PrismaClient will be automatically disconnected when the layer scope ends.
+ * Context tag for the Prisma client instance.
+ * Holds both the transaction client (tx) and the root client.
+ *
+ * Use \`PrismaClient.layer()\` or \`PrismaClient.layerEffect()\` to create a layer.
  *
  * @example
- * // Prisma 6 with defaults
- * const layer = makePrismaLayer({})
+ * // Create a layer with options
+ * const layer = PrismaClient.layer({ datasourceUrl: "..." })
  *
- * // With datasource URL override
- * const layer = makePrismaLayer({ datasourceUrl: process.env.DATABASE_URL })
- *
- * // Prisma 7 with adapter (required in v7)
- * const layer = makePrismaLayer({ adapter: myAdapter })
+ * // Create a layer with effectful options (e.g., for adapters)
+ * const layer = PrismaClient.layerEffect(
+ *   Effect.gen(function* () {
+ *     const config = yield* ConfigService
+ *     return { datasourceUrl: config.databaseUrl }
+ *   })
+ * )
  */
-export const makePrismaLayer = <T extends ConstructorParameters<typeof PrismaClient>[0]>(options: T) => Layer.scoped(
-  PrismaClientService,
-  Effect.gen(function* () {
-    const prisma = new PrismaClient(options)
-    yield* Effect.addFinalizer(() => Effect.promise(() => prisma.$disconnect()))
-    return {
-      tx: prisma,
-      client: prisma
-    }
-  })
-)
+export class PrismaClient extends Context.Tag("PrismaClient")<
+  PrismaClient,
+  {
+    tx: BasePrismaClient | PrismaNamespace.TransactionClient
+    client: BasePrismaClient
+  }
+>() {
+  /**
+   * Create a PrismaClient layer with the given options.
+   * The client will be automatically disconnected when the layer scope ends.
+   *
+   * @example
+   * // Prisma 6 with defaults
+   * const layer = PrismaClient.layer({})
+   *
+   * // With datasource URL override
+   * const layer = PrismaClient.layer({ datasourceUrl: process.env.DATABASE_URL })
+   *
+   * // Prisma 7 with adapter (required in v7)
+   * const layer = PrismaClient.layer({ adapter: myAdapter })
+   */
+  static layer = <T extends ConstructorParameters<typeof BasePrismaClient>[0]>(options: T) => Layer.scoped(
+    PrismaClient,
+    Effect.gen(function* () {
+      const prisma = new BasePrismaClient(options)
+      yield* Effect.addFinalizer(() => Effect.promise(() => prisma.$disconnect()))
+      return {
+        tx: prisma,
+        client: prisma
+      }
+    })
+  )
 
-/**
- * Default layer that creates a PrismaClient with no options.
- * Works with Prisma 6. For Prisma 7, use makePrismaLayer with adapter/accelerateUrl.
- */
-export const LivePrismaLayer = makePrismaLayer({} as ConstructorParameters<typeof PrismaClient>[0])
+  /**
+   * Create a PrismaClient layer where options are computed via an Effect.
+   * Useful when you need to fetch configuration from environment, config service, or create adapters.
+   * The client will be automatically disconnected when the layer scope ends.
+   *
+   * @example
+   * // Get datasource URL from Config service
+   * const layer = PrismaClient.layerEffect(
+   *   Effect.gen(function* () {
+   *     const config = yield* ConfigService
+   *     return { datasourceUrl: config.databaseUrl }
+   *   })
+   * )
+   *
+   * @example
+   * // Create adapter using Effect
+   * const layer = PrismaClient.layerEffect(
+   *   Effect.gen(function* () {
+   *     const pool = yield* PostgresPool
+   *     const adapter = yield* Effect.sync(() => PrismaNeon(pool))
+   *     return { adapter }
+   *   })
+   * )
+   */
+  static layerEffect = <R, E, T extends ConstructorParameters<typeof BasePrismaClient>[0]>(
+    optionsEffect: Effect.Effect<T, E, R>
+  ) => Layer.scoped(
+    PrismaClient,
+    Effect.gen(function* () {
+      const options = yield* optionsEffect
+      const prisma = new BasePrismaClient(options)
+      yield* Effect.addFinalizer(() => Effect.promise(() => prisma.$disconnect()))
+      return {
+        tx: prisma,
+        client: prisma
+      }
+    })
+  )
+
+  /**
+   * Default layer that creates a PrismaClient with no options.
+   * Works with Prisma 6. For Prisma 7, use PrismaClient.layer() with adapter/accelerateUrl.
+   */
+  static Default = PrismaClient.layer({} as ConstructorParameters<typeof BasePrismaClient>[0])
+}
 
 export class PrismaUniqueConstraintError extends Data.TaggedError("PrismaUniqueConstraintError")<{
-  cause: Prisma.PrismaClientKnownRequestError
+  cause: PrismaNamespace.PrismaClientKnownRequestError
   operation: string
   model: string
 }> {}
 
 export class PrismaForeignKeyConstraintError extends Data.TaggedError("PrismaForeignKeyConstraintError")<{
-  cause: Prisma.PrismaClientKnownRequestError
+  cause: PrismaNamespace.PrismaClientKnownRequestError
   operation: string
   model: string
 }> {}
 
 export class PrismaRecordNotFoundError extends Data.TaggedError("PrismaRecordNotFoundError")<{
-  cause: Prisma.PrismaClientKnownRequestError
+  cause: PrismaNamespace.PrismaClientKnownRequestError
   operation: string
   model: string
 }> {}
 
 export class PrismaRelationViolationError extends Data.TaggedError("PrismaRelationViolationError")<{
-  cause: Prisma.PrismaClientKnownRequestError
+  cause: PrismaNamespace.PrismaClientKnownRequestError
   operation: string
   model: string
 }> {}
 
 export class PrismaRelatedRecordNotFoundError extends Data.TaggedError("PrismaRelatedRecordNotFoundError")<{
-  cause: Prisma.PrismaClientKnownRequestError
+  cause: PrismaNamespace.PrismaClientKnownRequestError
   operation: string
   model: string
 }> {}
 
 export class PrismaTransactionConflictError extends Data.TaggedError("PrismaTransactionConflictError")<{
-  cause: Prisma.PrismaClientKnownRequestError
+  cause: PrismaNamespace.PrismaClientKnownRequestError
   operation: string
   model: string
 }> {}
 
 export class PrismaValueTooLongError extends Data.TaggedError("PrismaValueTooLongError")<{
-  cause: Prisma.PrismaClientKnownRequestError
+  cause: PrismaNamespace.PrismaClientKnownRequestError
   operation: string
   model: string
 }> {}
 
 export class PrismaValueOutOfRangeError extends Data.TaggedError("PrismaValueOutOfRangeError")<{
-  cause: Prisma.PrismaClientKnownRequestError
+  cause: PrismaNamespace.PrismaClientKnownRequestError
   operation: string
   model: string
 }> {}
 
 export class PrismaDbConstraintError extends Data.TaggedError("PrismaDbConstraintError")<{
-  cause: Prisma.PrismaClientKnownRequestError
+  cause: PrismaNamespace.PrismaClientKnownRequestError
   operation: string
   model: string
 }> {}
 
 export class PrismaConnectionError extends Data.TaggedError("PrismaConnectionError")<{
-  cause: Prisma.PrismaClientKnownRequestError
+  cause: PrismaNamespace.PrismaClientKnownRequestError
   operation: string
   model: string
 }> {}
 
 export class PrismaMissingRequiredValueError extends Data.TaggedError("PrismaMissingRequiredValueError")<{
-  cause: Prisma.PrismaClientKnownRequestError
+  cause: PrismaNamespace.PrismaClientKnownRequestError
   operation: string
   model: string
 }> {}
 
 export class PrismaInputValidationError extends Data.TaggedError("PrismaInputValidationError")<{
-  cause: Prisma.PrismaClientKnownRequestError
+  cause: PrismaNamespace.PrismaClientKnownRequestError
   operation: string
   model: string
 }> {}
@@ -670,7 +886,7 @@ export type PrismaError =
 
 // Generic mapper for raw operations and fallback
 const mapError = (error: unknown, operation: string, model: string): PrismaError => {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+  if (error instanceof PrismaNamespace.PrismaClientKnownRequestError) {
     switch (error.code) {
       case "P2000":
         return new PrismaValueTooLongError({ cause: error, operation, model });
@@ -710,7 +926,7 @@ const mapError = (error: unknown, operation: string, model: string): PrismaError
 
 // Create, Upsert
 const mapCreateError = (error: unknown, operation: string, model: string): PrismaCreateError => {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+  if (error instanceof PrismaNamespace.PrismaClientKnownRequestError) {
     switch (error.code) {
       case "P2000":
         return new PrismaValueTooLongError({ cause: error, operation, model });
@@ -743,7 +959,7 @@ const mapCreateError = (error: unknown, operation: string, model: string): Prism
 
 // Update
 const mapUpdateError = (error: unknown, operation: string, model: string): PrismaUpdateError => {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+  if (error instanceof PrismaNamespace.PrismaClientKnownRequestError) {
     switch (error.code) {
       case "P2000":
         return new PrismaValueTooLongError({ cause: error, operation, model });
@@ -780,7 +996,7 @@ const mapUpdateError = (error: unknown, operation: string, model: string): Prism
 
 // Delete
 const mapDeleteError = (error: unknown, operation: string, model: string): PrismaDeleteError => {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+  if (error instanceof PrismaNamespace.PrismaClientKnownRequestError) {
     switch (error.code) {
       case "P2003":
         return new PrismaForeignKeyConstraintError({ cause: error, operation, model });
@@ -799,7 +1015,7 @@ const mapDeleteError = (error: unknown, operation: string, model: string): Prism
 
 // FindOrThrow
 const mapFindOrThrowError = (error: unknown, operation: string, model: string): PrismaFindOrThrowError => {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+  if (error instanceof PrismaNamespace.PrismaClientKnownRequestError) {
     switch (error.code) {
       case "P2024":
         return new PrismaConnectionError({ cause: error, operation, model });
@@ -812,7 +1028,7 @@ const mapFindOrThrowError = (error: unknown, operation: string, model: string): 
 
 // Find
 const mapFindError = (error: unknown, operation: string, model: string): PrismaFindError => {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+  if (error instanceof PrismaNamespace.PrismaClientKnownRequestError) {
     switch (error.code) {
       case "P2024":
         return new PrismaConnectionError({ cause: error, operation, model });
@@ -823,7 +1039,7 @@ const mapFindError = (error: unknown, operation: string, model: string): PrismaF
 
 // DeleteMany
 const mapDeleteManyError = (error: unknown, operation: string, model: string): PrismaDeleteManyError => {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+  if (error instanceof PrismaNamespace.PrismaClientKnownRequestError) {
     switch (error.code) {
       case "P2003":
         return new PrismaForeignKeyConstraintError({ cause: error, operation, model });
@@ -840,7 +1056,7 @@ const mapDeleteManyError = (error: unknown, operation: string, model: string): P
 
 // UpdateMany
 const mapUpdateManyError = (error: unknown, operation: string, model: string): PrismaUpdateManyError => {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+  if (error instanceof PrismaNamespace.PrismaClientKnownRequestError) {
     switch (error.code) {
       case "P2000":
         return new PrismaValueTooLongError({ cause: error, operation, model });
@@ -868,7 +1084,24 @@ const mapUpdateManyError = (error: unknown, operation: string, model: string): P
   throw error;
 }
 
-export class PrismaService extends Service<PrismaService>()("PrismaService", {
+/**
+ * The main Prisma service with all database operations.
+ * Provides type-safe, effectful access to your Prisma models.
+ *
+ * @example
+ * const program = Effect.gen(function* () {
+ *   const prisma = yield* Prisma
+ *   const user = yield* prisma.user.create({ data: { name: "Alice" } })
+ *   return user
+ * })
+ *
+ * // Run with default layer (Prisma 6)
+ * Effect.runPromise(program.pipe(Effect.provide(Prisma.Live)))
+ *
+ * // Or with custom options
+ * Effect.runPromise(program.pipe(Effect.provide(Prisma.layer({ datasourceUrl: "..." }))))
+ */
+export class Prisma extends Service<Prisma>()("Prisma", {
   effect: Effect.gen(function* () {
     return {
       $transaction: <R, E, A>(
@@ -876,11 +1109,11 @@ export class PrismaService extends Service<PrismaService>()("PrismaService", {
         options?: {
           maxWait?: number
           timeout?: number
-          isolationLevel?: Prisma.TransactionIsolationLevel
+          isolationLevel?: PrismaNamespace.TransactionIsolationLevel
         }
       ) =>
         Effect.flatMap(
-          Effect.all([PrismaClientService, Effect.runtime<R>()]),
+          Effect.all([PrismaClient, Effect.runtime<R>()]),
           ([{ client, tx }, runtime]): Effect.Effect<A, E | PrismaError, R> => {
             const isRootClient = "$transaction" in tx;
             if (!isRootClient) {
@@ -891,7 +1124,7 @@ export class PrismaService extends Service<PrismaService>()("PrismaService", {
                 client.$transaction(async (tx) => {
                   const exit = await Runtime.runPromiseExit(runtime)(
                     effect.pipe(
-                      Effect.provideService(PrismaClientService, {
+                      Effect.provideService(PrismaClient, {
                         tx,
                         client,
                       }),
@@ -911,6 +1144,91 @@ export class PrismaService extends Service<PrismaService>()("PrismaService", {
       ${modelOperations}
     }
   })
-}) {}
+}) {
+  /**
+   * Create a complete Prisma layer with the given PrismaClient options.
+   * This is the recommended way to create a Prisma layer - it bundles both
+   * PrismaClient and Prisma service together.
+   *
+   * @example
+   * // Prisma 6 with defaults
+   * const MainLayer = Prisma.layer({})
+   *
+   * // With datasource URL override
+   * const MainLayer = Prisma.layer({ datasourceUrl: process.env.DATABASE_URL })
+   *
+   * // Prisma 7 with adapter
+   * const MainLayer = Prisma.layer({ adapter: myAdapter })
+   *
+   * // Use it
+   * Effect.runPromise(program.pipe(Effect.provide(MainLayer)))
+   */
+  static layer = <T extends ConstructorParameters<typeof BasePrismaClient>[0]>(options: T) =>
+    Layer.merge(PrismaClient.layer(options), Prisma.Default)
+
+  /**
+   * Create a complete Prisma layer where PrismaClient options are computed via an Effect.
+   * This is useful when you need to fetch configuration or create adapters using Effect.
+   *
+   * @example
+   * // Get datasource URL from Config service
+   * const MainLayer = Prisma.layerEffect(
+   *   Effect.gen(function* () {
+   *     const config = yield* ConfigService
+   *     return { datasourceUrl: config.databaseUrl }
+   *   })
+   * )
+   *
+   * // Create adapter using Effect
+   * const MainLayer = Prisma.layerEffect(
+   *   Effect.gen(function* () {
+   *     const pool = yield* PostgresPool
+   *     const adapter = yield* Effect.sync(() => PrismaNeon(pool))
+   *     return { adapter }
+   *   })
+   * )
+   */
+  static layerEffect = <R, E, T extends ConstructorParameters<typeof BasePrismaClient>[0]>(
+    optionsEffect: Effect.Effect<T, E, R>
+  ) => Layer.merge(PrismaClient.layerEffect(optionsEffect), Prisma.Default)
+
+  /**
+   * Complete default layer with both PrismaClient and Prisma service.
+   * Works with Prisma 6. For Prisma 7, use Prisma.layer() with adapter.
+   *
+   * @example
+   * Effect.runPromise(program.pipe(Effect.provide(Prisma.Live)))
+   */
+  static Live = Layer.merge(PrismaClient.Default, Prisma.Default)
+}
+
+// ============================================================================
+// Deprecated aliases for backward compatibility
+// ============================================================================
+
+/**
+ * @deprecated Use \`PrismaClient\` instead. Will be removed in next major version.
+ */
+export const PrismaClientService = PrismaClient
+
+/**
+ * @deprecated Use \`Prisma\` instead. Will be removed in next major version.
+ */
+export const PrismaService = Prisma
+
+/**
+ * @deprecated Use \`PrismaClient.layer()\` instead. Will be removed in next major version.
+ */
+export const makePrismaLayer = PrismaClient.layer
+
+/**
+ * @deprecated Use \`PrismaClient.layerEffect()\` instead. Will be removed in next major version.
+ */
+export const makePrismaLayerEffect = PrismaClient.layerEffect
+
+/**
+ * @deprecated Use \`PrismaClient.Default\` instead. Will be removed in next major version.
+ */
+export const LivePrismaLayer = PrismaClient.Default
 `;
 }

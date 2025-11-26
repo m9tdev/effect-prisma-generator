@@ -7,7 +7,7 @@ A Prisma generator that creates a fully-typed, Effect-based service wrapper for 
 - 🚀 **Effect Integration**: All Prisma operations are wrapped in `Effect` for robust error handling and composability.
 - 🛡️ **Type Safety**: Full TypeScript support with generated types matching your Prisma schema.
 - 🧩 **Dependency Injection**: Integrates seamlessly with Effect's `Layer` and `Context` system.
-- 🔍 **Error Handling**: Automatically catches and wraps Prisma errors into a typed `PrismaError`.
+- 🔍 **Error Handling**: Automatically catches and wraps Prisma errors into typed `PrismaError` variants.
 
 ## Installation
 
@@ -58,42 +58,77 @@ Add the following to your `tsconfig.json`:
 Then you can import the generated types like this:
 
 ```typescript
-import { PrismaService } from "@prisma/effect";
+import { Prisma } from "@prisma/effect";
 ```
 
 Otherwise, you can import the generated types like this (adjust the path accordingly):
 
 ```typescript
-import { PrismaService } from "../../prisma/generated/effect";
+import { Prisma } from "../../prisma/generated/effect";
 ```
 
 ## Usage
 
-### 1. Provide the Layer
-
-First, provide the `LivePrismaLayer` in your application entry point or test setup.
+### Quick Start
 
 ```typescript
-import { LivePrismaLayer } from "@prisma/effect";
-import { Effect, Layer } from "effect";
-
-// ... in your program
-const MainLayer = Layer.mergeAll(
-  LivePrismaLayer,
-  // ... other layers
-);
-```
-
-### 2. Use the Service
-
-Access the `PrismaService` in your Effect programs.
-
-```typescript
-import { PrismaService } from "./generated/effect";
+import { Prisma } from "@prisma/effect";
 import { Effect } from "effect";
 
 const program = Effect.gen(function* () {
-  const prisma = yield* PrismaService;
+  const prisma = yield* Prisma;
+
+  const users = yield* prisma.user.findMany({
+    where: { active: true },
+  });
+
+  return users;
+});
+
+// Run with the default layer (Prisma 6)
+Effect.runPromise(program.pipe(Effect.provide(Prisma.Live)));
+```
+
+### Layer Options
+
+The generator provides several ways to create layers:
+
+```typescript
+import { Prisma, PrismaClient } from "@prisma/effect";
+import { Effect, Layer } from "effect";
+
+// 1. Default layer (Prisma 6, no options)
+Prisma.Live
+
+// 2. Layer with static options
+Prisma.layer({ datasourceUrl: process.env.DATABASE_URL })
+
+// 3. Layer with effectful options (for adapters, config services, etc.)
+Prisma.layerEffect(
+  Effect.gen(function* () {
+    const config = yield* ConfigService;
+    return { datasourceUrl: config.databaseUrl };
+  })
+)
+
+// 4. For Prisma 7 with adapters
+Prisma.layerEffect(
+  Effect.gen(function* () {
+    const pool = yield* PostgresPool;
+    const adapter = yield* Effect.sync(() => new PrismaNeon(pool));
+    return { adapter };
+  })
+)
+```
+
+### Full Example
+
+```typescript
+import { Prisma } from "./generated/effect";
+import { Effect } from "effect";
+
+const program = Effect.gen(function* () {
+  const prisma = yield* Prisma;
 
   // All standard Prisma operations are available
   const users = yield* prisma.user.findMany({
@@ -111,11 +146,26 @@ const program = Effect.gen(function* () {
 
   return users;
 });
+
+// Run the program
+Effect.runPromise(program.pipe(Effect.provide(Prisma.Live)));
 ```
 
 ## API
 
-The generated `PrismaService` mirrors your Prisma Client API but returns `Effect<Success, PrismaError, Requirements>` instead of Promises.
+The generated `Prisma` service mirrors your Prisma Client API but returns `Effect<Success, PrismaError, Requirements>` instead of Promises.
+
+### Layer Constructors
+
+| API | Description |
+|-----|-------------|
+| `Prisma.Live` | Complete default layer (Prisma 6, no options) |
+| `Prisma.layer(opts)` | Complete layer with PrismaClient options |
+| `Prisma.layerEffect(effect)` | Complete layer with effectful options |
+| `Prisma.Default` | Just the service layer (for advanced composition) |
+| `PrismaClient.layer(opts)` | Just the client layer (for advanced composition) |
+| `PrismaClient.layerEffect(effect)` | Just the client layer with effectful options |
+| `PrismaClient.Default` | Default client layer (for advanced composition) |
 
 ### Error Handling
 
@@ -123,14 +173,14 @@ Operations return typed errors that you can handle with Effect's error handling 
 
 ```typescript
 import {
-  PrismaService,
+  Prisma,
   PrismaUniqueConstraintError,
   PrismaRecordNotFoundError,
   PrismaForeignKeyConstraintError,
 } from "@prisma/effect";
 
 const program = Effect.gen(function* () {
-  const prisma = yield* PrismaService;
+  const prisma = yield* Prisma;
 
   // Handle specific error types with catchTag
   const user = yield* prisma.user
@@ -223,10 +273,10 @@ export const mapPrismaError = (
 Now all operations will use your `MyPrismaError` type:
 
 ```typescript
-import { PrismaService, MyPrismaError } from "./generated/effect";
+import { Prisma, MyPrismaError } from "./generated/effect";
 
 const program = Effect.gen(function* () {
-  const prisma = yield* PrismaService;
+  const prisma = yield* Prisma;
 
   // All errors are now MyPrismaError
   yield* prisma.user
@@ -251,7 +301,7 @@ The generated service includes a `$transaction` method that allows you to run mu
 
 ```typescript
 const program = Effect.gen(function* () {
-  const prisma = yield* PrismaService;
+  const prisma = yield* Prisma;
 
   const result = yield* prisma.$transaction(
     Effect.gen(function* () {
@@ -360,7 +410,7 @@ Functions that use `$transaction` internally work seamlessly when called from an
 const UserService = {
   createWithProfile: (email: string) =>
     Effect.gen(function* () {
-      const prisma = yield* PrismaService;
+      const prisma = yield* Prisma;
       return yield* prisma.$transaction(
         Effect.gen(function* () {
           const user = yield* prisma.user.create({ data: { email } });
@@ -389,15 +439,15 @@ This pattern allows you to:
 2. Compose them in outer transactions for end-to-end atomicity
 3. Functions don't need to know if they're inside another transaction
 
-### Building Effect Services with PrismaService
+### Building Effect Services with Prisma
 
-You can build layered Effect services that wrap `PrismaService`. Transactions work correctly through any level of service composition.
+You can build layered Effect services that wrap `Prisma`. Transactions work correctly through any level of service composition.
 
 ```typescript
 // Level 1: Repository layer
 class UserRepo extends Effect.Service<UserRepo>()("UserRepo", {
   effect: Effect.gen(function* () {
-    const db = yield* PrismaService;
+    const db = yield* Prisma;
     return {
       create: (email: string, name: string) =>
         db.user.create({ data: { email, name } }),
@@ -409,7 +459,7 @@ class UserRepo extends Effect.Service<UserRepo>()("UserRepo", {
 
 class PostRepo extends Effect.Service<PostRepo>()("PostRepo", {
   effect: Effect.gen(function* () {
-    const db = yield* PrismaService;
+    const db = yield* Prisma;
     return {
       create: (title: string, authorId: number) =>
         db.post.create({ data: { title, authorId } }),
@@ -422,7 +472,7 @@ class BlogService extends Effect.Service<BlogService>()("BlogService", {
   effect: Effect.gen(function* () {
     const users = yield* UserRepo;
     const posts = yield* PostRepo;
-    const db = yield* PrismaService;
+    const db = yield* Prisma;
 
     return {
       createAuthorWithPost: (email: string, name: string, title: string) =>
@@ -438,13 +488,12 @@ class BlogService extends Effect.Service<BlogService>()("BlogService", {
 }) {}
 
 // Wire up the layers
-const PrismaLayer = Layer.merge(LivePrismaLayer, PrismaService.Default);
 const RepoLayer = Layer.merge(UserRepo.Default, PostRepo.Default).pipe(
-  Layer.provide(PrismaLayer),
+  Layer.provide(Prisma.Live),
 );
 const ServiceLayer = BlogService.Default.pipe(
   Layer.provide(RepoLayer),
-  Layer.provide(PrismaLayer),
+  Layer.provide(Prisma.Live),
 );
 
 // Use it
@@ -458,49 +507,51 @@ Effect.runPromise(program.pipe(Effect.provide(ServiceLayer)));
 
 #### Why This Works
 
-You might wonder: if `PrismaService` is captured at layer construction time, how do transactions work?
+You might wonder: if `Prisma` is captured at layer construction time, how do transactions work?
 
 The key is **deferred execution**. When you call `db.user.create({ data })`, it doesn't execute immediately—it returns an **Effect** that describes what to do:
 
 ```typescript
 // Generated code (simplified)
 user: {
-  create: (args) => Effect.flatMap(PrismaClientService, ({ tx: client }) =>
+  create: (args) => Effect.flatMap(PrismaClient, ({ tx: client }) =>
     Effect.tryPromise({ try: () => client.user.create(args), ... })
   )
 }
 ```
 
-The `Effect.flatMap(PrismaClientService, ...)` defers the lookup of `PrismaClientService` until the Effect actually runs. When `$transaction` executes an inner effect, it provides a new `PrismaClientService` with the transaction client:
+The `Effect.flatMap(PrismaClient, ...)` defers the lookup of `PrismaClient` until the Effect actually runs. When `$transaction` executes an inner effect, it provides a new `PrismaClient` with the transaction client:
 
 ```typescript
 // Inside $transaction (simplified)
-effect.pipe(Effect.provideService(PrismaClientService, { tx: transactionClient, client }))
+effect.pipe(Effect.provideService(PrismaClient, { tx: transactionClient, client }))
 ```
 
-So even though you capture `db` (the `PrismaService`) at layer construction, the actual database client lookup happens at execution time—inside the transaction scope.
+So even though you capture `db` (the `Prisma` service) at layer construction, the actual database client lookup happens at execution time—inside the transaction scope.
 
 This means:
-- ✅ Services can store references to `PrismaService` at construction
+- ✅ Services can store references to `Prisma` at construction
 - ✅ Services can store effect-returning methods (e.g., `const createUser = db.user.create`)
 - ✅ Transactions work correctly through any number of service layers
 - ✅ Nested `$transaction` calls properly join the outer transaction
 
 ### Resource Management
 
-The `makePrismaLayer` function uses `Layer.scoped` with a finalizer to ensure the PrismaClient is properly disconnected when the layer scope ends:
+The `PrismaClient.layer` function uses `Layer.scoped` with a finalizer to ensure the PrismaClient is properly disconnected when the layer scope ends:
 
 ```typescript
-export const makePrismaLayer = <T extends ConstructorParameters<typeof PrismaClient>[0]>(
-  options: T
-) => Layer.scoped(
-  PrismaClientService,
-  Effect.gen(function* () {
-    const prisma = new PrismaClient(options)
-    yield* Effect.addFinalizer(() => Effect.promise(() => prisma.$disconnect()))
-    return { tx: prisma, client: prisma }
-  })
-)
+// Generated code (simplified)
+export class PrismaClient extends Context.Tag("PrismaClient")<...>() {
+  static layer = <T extends ConstructorParameters<typeof BasePrismaClient>[0]>(options: T) =>
+    Layer.scoped(
+      PrismaClient,
+      Effect.gen(function* () {
+        const prisma = new BasePrismaClient(options)
+        yield* Effect.addFinalizer(() => Effect.promise(() => prisma.$disconnect()))
+        return { tx: prisma, client: prisma }
+      })
+    )
+}
 ```
 
 This means:
@@ -511,7 +562,7 @@ This means:
 ```typescript
 // Connection is automatically managed
 const program = Effect.gen(function* () {
-  const prisma = yield* PrismaService;
+  const prisma = yield* Prisma;
   yield* prisma.user.findMany();
   // ... more operations
 });
@@ -519,10 +570,25 @@ const program = Effect.gen(function* () {
 // $disconnect is called automatically when this completes
 await Effect.runPromise(
   program.pipe(
-    Effect.provide(Layer.merge(LivePrismaLayer, PrismaService.Default)),
+    Effect.provide(Prisma.Live),
     Effect.scoped,
   )
 );
 ```
 
 For long-running applications (like servers), you typically provide the layer once at startup and it stays connected for the lifetime of the application.
+
+## Migration from v0.x
+
+If you're upgrading from an earlier version, the old API is still available but deprecated:
+
+| Old API (deprecated) | New API |
+|---------------------|---------|
+| `PrismaService` | `Prisma` |
+| `PrismaClientService` | `PrismaClient` |
+| `makePrismaLayer(opts)` | `PrismaClient.layer(opts)` |
+| `makePrismaLayerEffect(effect)` | `PrismaClient.layerEffect(effect)` |
+| `LivePrismaLayer` | `PrismaClient.Default` |
+| `Layer.merge(LivePrismaLayer, PrismaService.Default)` | `Prisma.Live` |
+
+The deprecated names will be removed in the next major version.
