@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "include": ["tests/**/*", "src/**/*"],
-  "exclude": ["tests/effect/**", "tests/prisma6/**", "tests/prisma7/**"],
+  "exclude": ["tests/effect/**", "tests/prisma6/**", "tests/prisma7/**", "tests/custom-error/**", "tests/import-extension/**"],
   "compilerOptions": {
     "module": "ES2022",
     "moduleResolution": "bundler",
