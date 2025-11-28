@@ -83,7 +83,7 @@ function generateModelOperations(models: DMMF.Model[]) {
       const modelNameCamel = toCamelCase(modelName);
 
       return `    ${modelNameCamel}: {
-      findUnique: (args: Parameters<PrismaClient['${modelNameCamel}']['findUnique']>[0]) =>
+      findUnique: <T extends Prisma.${modelName}FindUniqueArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}FindUniqueArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.findUnique(args),
@@ -91,7 +91,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           })
         ),
 
-      findUniqueOrThrow: (args: Parameters<PrismaClient['${modelNameCamel}']['findUniqueOrThrow']>[0]) =>
+      findUniqueOrThrow: <T extends Prisma.${modelName}FindUniqueOrThrowArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}FindUniqueOrThrowArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.findUniqueOrThrow(args),
@@ -99,7 +99,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           })
         ),
 
-      findFirst: (args?: Parameters<PrismaClient['${modelNameCamel}']['findFirst']>[0]) =>
+      findFirst: <T extends Prisma.${modelName}FindFirstArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}FindFirstArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.findFirst(args),
@@ -107,7 +107,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           })
         ),
 
-      findFirstOrThrow: (args?: Parameters<PrismaClient['${modelNameCamel}']['findFirstOrThrow']>[0]) =>
+      findFirstOrThrow: <T extends Prisma.${modelName}FindFirstOrThrowArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}FindFirstOrThrowArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.findFirstOrThrow(args),
@@ -115,7 +115,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           })
         ),
 
-      findMany: (args?: Parameters<PrismaClient['${modelNameCamel}']['findMany']>[0]) =>
+      findMany: <T extends Prisma.${modelName}FindManyArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}FindManyArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.findMany(args),
@@ -123,7 +123,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           })
         ),
 
-      create: (args: Parameters<PrismaClient['${modelNameCamel}']['create']>[0]) =>
+      create: <T extends Prisma.${modelName}CreateArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}CreateArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.create(args),
@@ -131,7 +131,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           })
         ),
 
-      createMany: (args?: Parameters<PrismaClient['${modelNameCamel}']['createMany']>[0]) =>
+      createMany: <T extends Prisma.${modelName}CreateManyArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}CreateManyArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.createMany(args),
@@ -139,7 +139,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           })
         ),
 
-      createManyAndReturn: (args?: Parameters<PrismaClient['${modelNameCamel}']['createManyAndReturn']>[0]) =>
+      createManyAndReturn: <T extends Prisma.${modelName}CreateManyAndReturnArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}CreateManyAndReturnArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.createManyAndReturn(args),
@@ -147,7 +147,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           })
         ),
 
-      delete: (args: Parameters<PrismaClient['${modelNameCamel}']['delete']>[0]) =>
+      delete: <T extends Prisma.${modelName}DeleteArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}DeleteArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.delete(args),
@@ -155,7 +155,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           })
         ),
 
-      update: (args: Parameters<PrismaClient['${modelNameCamel}']['update']>[0]) =>
+      update: <T extends Prisma.${modelName}UpdateArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}UpdateArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.update(args),
@@ -163,7 +163,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           })
         ),
 
-      deleteMany: (args?: Parameters<PrismaClient['${modelNameCamel}']['deleteMany']>[0]) =>
+      deleteMany: <T extends Prisma.${modelName}DeleteManyArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}DeleteManyArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.deleteMany(args),
@@ -171,7 +171,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           })
         ),
 
-      updateMany: (args: Parameters<PrismaClient['${modelNameCamel}']['updateMany']>[0]) =>
+      updateMany: <T extends Prisma.${modelName}UpdateManyArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}UpdateManyArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.updateMany(args),
@@ -179,7 +179,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           })
         ),
 
-      updateManyAndReturn: (args: Parameters<PrismaClient['${modelNameCamel}']['updateManyAndReturn']>[0]) =>
+      updateManyAndReturn: <T extends Prisma.${modelName}UpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}UpdateManyAndReturnArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.updateManyAndReturn(args),
@@ -187,7 +187,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           })
         ),
 
-      upsert: (args: Parameters<PrismaClient['${modelNameCamel}']['upsert']>[0]) =>
+      upsert: <T extends Prisma.${modelName}UpsertArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}UpsertArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.upsert(args),
@@ -196,7 +196,7 @@ function generateModelOperations(models: DMMF.Model[]) {
         ),
 
       // Aggregation operations
-      count: (args?: Parameters<PrismaClient['${modelNameCamel}']['count']>[0]) =>
+      count: <T extends Prisma.${modelName}CountArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}CountArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.count(args),
@@ -204,7 +204,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           })
         ),
 
-      aggregate: (args: Parameters<PrismaClient['${modelNameCamel}']['aggregate']>[0]) =>
+      aggregate: <T extends Prisma.${modelName}AggregateArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}AggregateArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.aggregate(args),
@@ -212,7 +212,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           })
         ),
 
-      groupBy: (args: Parameters<PrismaClient['${modelNameCamel}']['groupBy']>[0]) =>
+      groupBy: <T extends Prisma.${modelName}GroupByArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}GroupByArgs>) =>
         Effect.flatMap(PrismaClientService, ({ tx: client }) =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.groupBy(args as any),
