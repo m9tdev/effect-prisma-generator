@@ -48,6 +48,25 @@ describe("Prisma Effect Generator", () => {
     }).pipe(Effect.provide(MainLayer)),
   );
 
+  it.effect("should create and find nested posts", () =>
+    Effect.gen(function* () {
+      const prisma = yield* PrismaService;
+      const email = `test-${Date.now()}@example.com`;
+      const user = yield* prisma.user.create({
+        data: {
+          email,
+          name: "Test User",
+          posts: { create: { title: "Test Post", content: "Test Content" } },
+        },
+        include: { posts: true },
+      });
+      expect(user.posts.length).toBe(1);
+      expect(user.posts[0].title).toBe("Test Post");
+      expect(user.posts[0].content).toBe("Test Content");
+      expect(user.posts[0].authorId).toBe(user.id);
+    }).pipe(Effect.provide(MainLayer)),
+  );
+
   it.effect("should support transactions", () =>
     Effect.gen(function* () {
       const prisma = yield* PrismaService;
