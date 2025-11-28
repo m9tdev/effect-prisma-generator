@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.6.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.5.0...v0.6.0) (2025-11-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* PrismaService itself (instead of it's functions) now depends on PrismaClientService.
+* The type of PrismaClientService is now PrismaClient instead of { client: PrismaClientService; tx: Prisma.TransactionClient }
+
+### Bug Fixes
+
+* PrismaService itself (instead of it's functions) now depends on PrismaClientService. ([488a18e](https://github.com/m9tdev/effect-prisma-generator/commit/488a18e07feae5cf7d4ba534858970580f3dddba))
+* remove PrismaClientService dependency from PrismaService ([488a18e](https://github.com/m9tdev/effect-prisma-generator/commit/488a18e07feae5cf7d4ba534858970580f3dddba))
+
+
+### Code Refactoring
+
+* The type of PrismaClientService is now PrismaClient instead of { client: PrismaClientService; tx: Prisma.TransactionClient } ([488a18e](https://github.com/m9tdev/effect-prisma-generator/commit/488a18e07feae5cf7d4ba534858970580f3dddba))
+
 ## [0.5.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.4.0...v0.5.0) (2025-11-28)
 
 
