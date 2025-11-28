@@ -71,15 +71,21 @@ import { PrismaService } from "../../prisma/generated/effect";
 
 ### 1. Provide the Layer
 
-First, provide the `LivePrismaLayer` in your application entry point or test setup.
+First, create the `LivePrismaLayer` and merge it with the
+`PrismaService.Default` layer in your application entry point or test setup.
 
 ```typescript
-import { LivePrismaLayer } from "@prisma/effect";
 import { Effect, Layer } from "effect";
+import {
+  createPrismaClientLayer,
+  PrismaService,
+} from "./prisma/generated/effect";
 
 // ... in your program
+const LivePrismaLayer = createPrismaClientLayer(new PrismaClient());
 const MainLayer = Layer.mergeAll(
   LivePrismaLayer,
+  PrismaService.Default
   // ... other layers
 );
 ```
@@ -139,6 +145,7 @@ Each operation type (create, update, delete, find, etc.) returns a specific unio
 - `PrismaInputValidationError`
 
 All errors carry the following context:
+
 ```typescript
 {
   cause: Prisma.PrismaClientKnownRequestError;

@@ -1,12 +1,14 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Data, Effect, Layer } from "effect";
+import { PrismaClient } from "./prisma/generated/client";
 import {
-  LivePrismaLayer,
+  createPrismaClientLayer,
   PrismaService,
   PrismaUniqueConstraintError,
-} from "./generated/effect/index.js";
+} from "./prisma/generated/effect";
 
 describe("Prisma Effect Generator", () => {
+  const LivePrismaLayer = createPrismaClientLayer(new PrismaClient());
   const MainLayer = Layer.merge(LivePrismaLayer, PrismaService.Default);
 
   it.effect("should create and find a user", () =>

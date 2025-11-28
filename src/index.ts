@@ -245,15 +245,14 @@ export class PrismaClientService extends Context.Tag("PrismaClientService")<
   }
 >() {}
 
-export const LivePrismaLayer = Layer.effect(
+export const createPrismaClientLayer = (client: PrismaClient) => Layer.effect(
   PrismaClientService,
   Effect.sync(() => {
-    const prisma = new PrismaClient()
     return {
       // The \`tx\` property (transaction) can be shared and overridden,
       // but the \`client\` property must always be a PrismaClient instance.
-      tx: prisma,
-      client: prisma
+      tx: client,
+      client: client
     }
   })
 )
