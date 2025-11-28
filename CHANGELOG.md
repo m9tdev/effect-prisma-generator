@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.6.0...v0.7.0) (2025-11-28)
+
+
+### Features
+
+* output to a file instead of directory ([#10](https://github.com/m9tdev/effect-prisma-generator/issues/10)) ([da9c5de](https://github.com/m9tdev/effect-prisma-generator/commit/da9c5debebd5103690dbeef9bb92ca044307e72c))
+
+
+### Bug Fixes
+
+* correctly infer groupBy return type ([60addd2](https://github.com/m9tdev/effect-prisma-generator/commit/60addd2b818c51d2f646ba3cd08494a6b3ec392c))
+
 ## [0.6.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.5.0...v0.6.0) (2025-11-28)
 
 
