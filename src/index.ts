@@ -17,7 +17,6 @@ generatorHandler({
     return {
       defaultOutput: "../generated/effect",
       prettyName: "Prisma Effect Generator",
-      requiresEngines: ["queryEngine"],
     };
   },
 
