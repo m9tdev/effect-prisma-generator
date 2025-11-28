@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.5.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.4.0...v0.5.0) (2025-11-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* replace LivePrismaLayer with createPrismaClientLayer
+
+### Features
+
+* upgrade to prisma v7 ([b1b4bfd](https://github.com/m9tdev/effect-prisma-generator/commit/b1b4bfdb1611aa54217c10bfa6c26498ef86a620))
+
+
+### Bug Fixes
+
+* remove unnecessary queryEngine requirement ([79d8a16](https://github.com/m9tdev/effect-prisma-generator/commit/79d8a1694e8b6fe7902ac3c76fd6048134b747c4))
+* replace LivePrismaLayer with createPrismaClientLayer ([6329444](https://github.com/m9tdev/effect-prisma-generator/commit/6329444ad2538dd28429ac4bf40b7be47039433e))
+* use generic arg types to fix return types ([bce858d](https://github.com/m9tdev/effect-prisma-generator/commit/bce858d2b475766283352e7b608d18490152b5d7))
+
+
+### Miscellaneous Chores
+
+* release 0.5.0 ([3056c22](https://github.com/m9tdev/effect-prisma-generator/commit/3056c228d6c878d37040b37292d73596901707ad))
+
 ## [0.4.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.3.3...v0.4.0) (2025-11-20)
 
 
