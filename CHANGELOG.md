@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/m9tdev/effect-prisma-generator/compare/v0.7.0...v0.7.1) (2025-12-03)
+
+
+### Bug Fixes
+
+* correctly infer groupBy error type ([30590fd](https://github.com/m9tdev/effect-prisma-generator/commit/30590fd163db7a8577d3cdc80af9858431b5eeef))
+
 ## [0.7.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.6.0...v0.7.0) (2025-11-28)
 
 
