@@ -274,10 +274,22 @@ function generateModelOperations(models: DMMF.Model[]) {
           }[OrderFields]
       >(args: Prisma.SubsetIntersection<T, Prisma.${modelName}GroupByArgs, OrderByArg> & InputErrors) =>
         Effect.flatMap(clientOrTx(client), client =>
-          // @ts-ignore - Gives the error \`Error: "by" must not be empty.\`, but if this is actually the case, this will still show up at the caller.
           Effect.tryPromise({
-            // @ts-ignore - Also gives an error. But if this is actually the case, this will still show up at the caller.
-            try: () => client.${modelNameCamel}.groupBy(args),
+            try: () => client.${modelNameCamel}.groupBy(args as any) as Prisma.PrismaPromise<
+              Array<Prisma.PickEnumerable<Prisma.${modelName}GroupByOutputType, T["by"]> & {
+                  [P in keyof T &
+                    keyof Prisma.${modelName}GroupByOutputType]: P extends "_count"
+                    ? T[P] extends boolean
+                      ? number
+                      : Prisma.GetScalarType<
+                          T[P],
+                          Prisma.${modelName}GroupByOutputType[P]
+                        >
+                    : Prisma.GetScalarType<
+                        T[P],
+                        Prisma.${modelName}GroupByOutputType[P]
+                      >;
+                }>>,
             catch: (error) => mapFindError(error, "groupBy", "${modelName}")
           }),
         ),
