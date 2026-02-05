@@ -32,11 +32,11 @@ const program = Effect.gen(function* () {
   if (clean) {
     yield* run(".", "tsc", "--noEmit");
   }
-  yield* run("./tests", "prisma", "generate");
-  const dbExists = yield* fs.exists("prisma/dev.db");
+  const dbExists = yield* fs.exists("tests/prisma/dev.db");
   if (clean || !dbExists) {
     yield* run("./tests", "prisma", "db", "push");
   }
+  yield* run("./tests", "prisma", "generate", "--sql");
   yield* run("./tests", "tsc", "--noEmit");
   yield* run("./tests", "vitest", "run");
 }).pipe(

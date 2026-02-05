@@ -76,6 +76,14 @@ function generateRawSqlOperations() {
           try: () => client.$queryRawUnsafe(query, ...values),
           catch: (error) => mapError(error, "$queryRawUnsafe", "Prisma")
         }),
+      ),
+
+    $queryRawTyped: <T>(typedQuery: runtime.TypedSql<unknown[], T>) =>
+      Effect.flatMap(clientOrTx(client), client =>
+        Effect.tryPromise({
+          try: () => client.$queryRawTyped(typedQuery),
+          catch: (error) => mapError(error, "$queryRawTyped", "Prisma")
+        }),
       ),`;
 }
 
@@ -310,6 +318,7 @@ async function generateUnifiedService(
 import { Cause, Context, Data, Effect, Exit, Option, Runtime } from "effect"
 import { Service } from "effect/Effect"
 import { Prisma, PrismaClient } from "${clientImportPath}"
+import * as runtime from "@prisma/client/runtime/client"
 
 export class PrismaClientService extends Context.Tag("PrismaClientService")<
   PrismaClientService,
