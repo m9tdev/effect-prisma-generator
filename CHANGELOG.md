@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.7.1...v0.8.0) (2026-02-05)
+
+
+### Features
+
+* add support for Prisma TypedSQL ($queryRawTyped) ([#18](https://github.com/m9tdev/effect-prisma-generator/issues/18)) ([b3de18c](https://github.com/m9tdev/effect-prisma-generator/commit/b3de18c5a68325b8fc9c68b8e2f7b1331019cad0))
+
 ## [0.7.1](https://github.com/m9tdev/effect-prisma-generator/compare/v0.7.0...v0.7.1) (2025-12-03)
 
 
