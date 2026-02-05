@@ -8,6 +8,7 @@ import {
   PrismaTransactionClientService,
   PrismaUniqueConstraintError,
 } from "./prisma/generated/effect";
+import { getUsersByName } from "./prisma/generated/sql";
 
 describe("Prisma Effect Generator", () => {
   const url = "file:prisma/dev.db";
@@ -238,6 +239,55 @@ describe("Prisma Effect Generator", () => {
       if (error instanceof MyCustomError) {
         expect(error.message).toBe("boom");
       }
+    }).pipe(Effect.provide(MainLayer)),
+  );
+
+  it.effect("should support $queryRawTyped with TypedSQL", () =>
+    Effect.gen(function* () {
+      const prisma = yield* PrismaService;
+      const email = `typed-sql-test-${Date.now()}@example.com`;
+
+      // Create test user
+      const user = yield* prisma.user.create({
+        data: { email, name: "TypedSQL Test User" },
+      });
+
+      // Use TypedSQL query
+      const users = yield* prisma.$queryRawTyped(
+        getUsersByName("%TypedSQL%"),
+      );
+
+      // Verify result
+      expect(users.length).toBeGreaterThan(0);
+      expect(users[0].email).toBeDefined();
+      expect(users[0].name).toContain("TypedSQL");
+
+      // Cleanup
+      yield* prisma.user.delete({ where: { id: user.id } });
+    }).pipe(Effect.provide(MainLayer)),
+  );
+
+  it.effect("should support $queryRawTyped within transactions", () =>
+    Effect.gen(function* () {
+      const prisma = yield* PrismaService;
+      const email = `tx-typed-sql-${Date.now()}@example.com`;
+
+      yield* prisma.$transaction(
+        Effect.gen(function* () {
+          yield* prisma.user.create({
+            data: { email, name: "Transaction TypedSQL User" },
+          });
+
+          const users = yield* prisma.$queryRawTyped(
+            getUsersByName("%Transaction TypedSQL%"),
+          );
+          expect(users.length).toBe(1);
+          expect(users[0].name).toBe("Transaction TypedSQL User");
+        }),
+      );
+
+      // Cleanup
+      yield* prisma.user.delete({ where: { email } });
     }).pipe(Effect.provide(MainLayer)),
   );
 });
