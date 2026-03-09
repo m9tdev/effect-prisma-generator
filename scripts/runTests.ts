@@ -37,6 +37,7 @@ const program = Effect.gen(function* () {
     yield* run("./tests", "prisma", "db", "push");
   }
   yield* run("./tests", "prisma", "generate", "--sql");
+  yield* run("./tests/no-typedsql", "prisma", "generate");
   yield* run("./tests", "tsc", "--noEmit");
   yield* run("./tests", "vitest", "run");
 }).pipe(

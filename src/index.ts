@@ -37,14 +37,27 @@ generatorHandler({
       throw new Error("effect-prisma-generator: outputPath must be a ts file");
     }
 
+    const hasTypedSql = [options.generator, ...options.otherGenerators]
+      .some(g => g.previewFeatures.includes("typedSql"));
+
     const outputDir = path.dirname(outputPath);
     await fs.mkdir(outputDir, { recursive: true });
 
-    await generateUnifiedService([...models], outputPath, clientImportPath);
+    await generateUnifiedService([...models], outputPath, clientImportPath, hasTypedSql);
   },
 });
 
-function generateRawSqlOperations() {
+function generateRawSqlOperations(hasTypedSql: boolean) {
+  const typedSqlOperation = hasTypedSql ? `
+
+    $queryRawTyped: <T>(typedQuery: runtime.TypedSql<unknown[], T>) =>
+      Effect.flatMap(clientOrTx(client), client =>
+        Effect.tryPromise({
+          try: () => client.$queryRawTyped(typedQuery),
+          catch: (error) => mapError(error, "$queryRawTyped", "Prisma")
+        }),
+      ),` : '';
+
   return `
     $executeRaw: (args: Prisma.Sql | [Prisma.Sql, ...any[]]) =>
       Effect.flatMap(clientOrTx(client), client =>
@@ -76,15 +89,7 @@ function generateRawSqlOperations() {
           try: () => client.$queryRawUnsafe(query, ...values),
           catch: (error) => mapError(error, "$queryRawUnsafe", "Prisma")
         }),
-      ),
-
-    $queryRawTyped: <T>(typedQuery: runtime.TypedSql<unknown[], T>) =>
-      Effect.flatMap(clientOrTx(client), client =>
-        Effect.tryPromise({
-          try: () => client.$queryRawTyped(typedQuery),
-          catch: (error) => mapError(error, "$queryRawTyped", "Prisma")
-        }),
-      ),`;
+      ),${typedSqlOperation}`;
 }
 
 function generateModelOperations(models: DMMF.Model[]) {
@@ -310,15 +315,17 @@ async function generateUnifiedService(
   models: DMMF.Model[],
   outputPath: string,
   clientImportPath: string,
+  hasTypedSql: boolean,
 ) {
-  const rawSqlOperations = generateRawSqlOperations();
+  const rawSqlOperations = generateRawSqlOperations(hasTypedSql);
   const modelOperations = generateModelOperations(models);
+
+  const runtimeImport = hasTypedSql ? `\nimport * as runtime from "@prisma/client/runtime/client"` : '';
 
   const serviceContent = `${header}
 import { Cause, Context, Data, Effect, Exit, Option, Runtime } from "effect"
 import { Service } from "effect/Effect"
-import { Prisma, PrismaClient } from "${clientImportPath}"
-import * as runtime from "@prisma/client/runtime/client"
+import { Prisma, PrismaClient } from "${clientImportPath}"${runtimeImport}
 
 export class PrismaClientService extends Context.Tag("PrismaClientService")<
   PrismaClientService,

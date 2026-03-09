@@ -1,0 +1,19 @@
+datasource db {
+  provider = "sqlite"
+}
+
+generator client {
+  provider = "prisma-client"
+  output   = "./generated"
+}
+
+generator effect {
+  provider         = "node ../../dist/index.js"
+  output           = "./generated/effect.ts"
+  clientImportPath = "./client"
+}
+
+model User {
+  id    Int    @id @default(autoincrement())
+  email String @unique
+}
