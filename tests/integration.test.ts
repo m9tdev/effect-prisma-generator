@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { Data, Effect, Layer } from "effect";
+import * as fs from "fs";
 import { PrismaClient } from "./prisma/generated/client";
 import {
   PrismaClientService,
@@ -290,4 +291,16 @@ describe("Prisma Effect Generator", () => {
       yield* prisma.user.delete({ where: { email } });
     }).pipe(Effect.provide(MainLayer)),
   );
+
+  it("should include $queryRawTyped when typedSql preview feature is enabled", () => {
+    const generated = fs.readFileSync("prisma/generated/effect.ts", "utf-8");
+    expect(generated).toContain("$queryRawTyped");
+    expect(generated).toContain('import * as runtime from "@prisma/client/runtime/client"');
+  });
+
+  it("should not include $queryRawTyped when typedSql preview feature is not enabled", () => {
+    const generated = fs.readFileSync("no-typedsql/generated/effect.ts", "utf-8");
+    expect(generated).not.toContain("$queryRawTyped");
+    expect(generated).not.toContain('import * as runtime from "@prisma/client/runtime/client"');
+  });
 });
