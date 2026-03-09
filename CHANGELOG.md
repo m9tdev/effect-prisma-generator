@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/m9tdev/effect-prisma-generator/compare/v0.8.0...v0.8.1) (2026-03-09)
+
+
+### Bug Fixes
+
+* make $queryRawTyped generation conditional on typedSql preview feature ([#21](https://github.com/m9tdev/effect-prisma-generator/issues/21)) ([60675e5](https://github.com/m9tdev/effect-prisma-generator/commit/60675e5e7304359f311a7f6c08c3e0f43b6c3bd7))
+
 ## [0.8.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.7.1...v0.8.0) (2026-02-05)
 
 
