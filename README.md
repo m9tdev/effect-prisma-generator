@@ -21,8 +21,6 @@ pnpm add -D effect-prisma-generator
 yarn add -D effect-prisma-generator
 ```
 
-> **Compatibility:** The generated service targets **Effect v4** (`effect@4.0.0-beta.x`) and **Prisma 7**. Effect v4 is currently in beta, so expect API churn between betas. For Effect v3, use `effect-prisma-generator@0.8.x`.
-
 ## Configuration
 
 Add the generator to your `schema.prisma` file:
