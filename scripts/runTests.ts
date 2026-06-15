@@ -1,24 +1,24 @@
-import { Command, FileSystem } from "@effect/platform";
-import { NodeContext, NodeRuntime } from "@effect/platform-node";
-import { Console, Effect } from "effect";
+import { NodeRuntime, NodeServices } from "@effect/platform-node";
+import { Console, Effect, FileSystem } from "effect";
+import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 const run = (cwd: string, cmd: string, ...args: string[]) =>
   Effect.gen(function* () {
     yield* Console.log(cmd, ...args);
-    yield* Command.make(cmd, ...args).pipe(
-      Command.workingDirectory(cwd),
-      Command.stdout("inherit"),
-      Command.stderr("inherit"),
-      Command.exitCode,
-      Effect.map((exitCode) => {
-        if (exitCode !== 0) {
-          return Effect.fail(
-            new Error(`Command failed with exit code ${exitCode}`),
-          );
-        }
-        return exitCode;
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    const exitCode = yield* spawner.exitCode(
+      ChildProcess.make(cmd, args, {
+        cwd,
+        stdout: "inherit",
+        stderr: "inherit",
       }),
     );
+    if (exitCode !== 0) {
+      return yield* Effect.fail(
+        new Error(`Command failed with exit code ${exitCode}`),
+      );
+    }
+    return exitCode;
   });
 
 const program = Effect.gen(function* () {
@@ -49,5 +49,5 @@ const program = Effect.gen(function* () {
 );
 
 NodeRuntime.runMain(
-  Effect.scoped(program.pipe(Effect.provide(NodeContext.layer))),
+  Effect.scoped(program.pipe(Effect.provide(NodeServices.layer))),
 );

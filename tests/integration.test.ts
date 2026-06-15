@@ -16,7 +16,7 @@ describe("Prisma Effect Generator", () => {
   const adapter = new PrismaBetterSqlite3({ url });
   const prisma = new PrismaClient({ adapter });
   const MainLayer = Layer.provide(
-    PrismaService.Default,
+    PrismaService.layer,
     Layer.succeed(PrismaClientService, prisma),
   );
 

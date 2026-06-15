@@ -21,6 +21,8 @@ pnpm add -D effect-prisma-generator
 yarn add -D effect-prisma-generator
 ```
 
+> **Compatibility:** The generated service targets **Effect v4** (`effect@4.0.0-beta.x`) and **Prisma 7**. Effect v4 is currently in beta, so expect API churn between betas. For Effect v3, use `effect-prisma-generator@0.8.x`.
+
 ## Configuration
 
 Add the generator to your `schema.prisma` file:
@@ -73,7 +75,7 @@ import { PrismaService } from "../../prisma/generated/effect";
 
 ### 1. Provide the Layer
 
-Initialize the `PrismaClient` and provide it to the `PrismaService.Default` layer as a `PrismaClientService`.
+Initialize the `PrismaClient` and provide it to the `PrismaService.layer` as a `PrismaClientService`.
 
 ```typescript
 import { Effect, Layer } from "effect";
@@ -82,7 +84,7 @@ import { PrismaService, PrismaClientService } from "~prisma/effect";
 // ... in your program
 const prisma = new PrismaClient({ adapter });
 const PrismaLayer = Layer.provide(
-  PrismaService.Default,
+  PrismaService.layer,
   Layer.succeed(PrismaClientService, prisma),
 );
 ```
