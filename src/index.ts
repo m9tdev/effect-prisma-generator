@@ -323,19 +323,18 @@ async function generateUnifiedService(
   const runtimeImport = hasTypedSql ? `\nimport * as runtime from "@prisma/client/runtime/client"` : '';
 
   const serviceContent = `${header}
-import { Cause, Context, Data, Effect, Exit, Option, Runtime } from "effect"
-import { Service } from "effect/Effect"
+import { Cause, Context, Data, Effect, Exit, Layer, Option } from "effect"
 import { Prisma, PrismaClient } from "${clientImportPath}"${runtimeImport}
 
-export class PrismaClientService extends Context.Tag("PrismaClientService")<
+export class PrismaClientService extends Context.Service<
   PrismaClientService,
   PrismaClient
->() {}
+>()("PrismaClientService") {}
 
-export class PrismaTransactionClientService extends Context.Tag("PrismaTransactionClientService")<
+export class PrismaTransactionClientService extends Context.Service<
   PrismaTransactionClientService,
   Prisma.TransactionClient
->() {}
+>()("PrismaTransactionClientService") {}
 
 export class PrismaUniqueConstraintError extends Data.TaggedError("PrismaUniqueConstraintError")<{
   cause: Prisma.PrismaClientKnownRequestError
@@ -685,8 +684,8 @@ const clientOrTx = (client: PrismaClient) => Effect.map(
   Option.getOrElse(() => client),
 );
 
-export class PrismaService extends Service<PrismaService>()("PrismaService", {
-  effect: Effect.gen(function* () {
+export class PrismaService extends Context.Service<PrismaService>()("PrismaService", {
+  make: Effect.gen(function* () {
     const client = yield* PrismaClientService;
     return {
       $transaction: <A, E, R>(
@@ -698,14 +697,14 @@ export class PrismaService extends Service<PrismaService>()("PrismaService", {
         }
       ) =>
         Effect.gen(function* () {
-          const runtime = yield* Effect.runtime<R>();
+          const services = yield* Effect.context<R>();
           const tx = yield* Effect.serviceOption(PrismaTransactionClientService);
           return yield* Option.match(tx, {
             onSome: (tx) => effect,
             onNone: () =>  Effect.tryPromise({
               try: () =>
                 client.$transaction(async (tx) => {
-                  const exit = await Runtime.runPromiseExit(runtime)(
+                  const exit = await Effect.runPromiseExitWith(services)(
                     effect.pipe(Effect.provideService(PrismaTransactionClientService, tx)) as Effect.Effect<A, E, R>,
                   )
                   if (Exit.isSuccess(exit)) {
@@ -722,7 +721,9 @@ export class PrismaService extends Service<PrismaService>()("PrismaService", {
       ${modelOperations}
     }
   })
-}) {}
+}) {
+  static readonly layer = Layer.effect(this, this.make)
+}
 `;
 
   await fs.writeFile(outputPath, serviceContent);

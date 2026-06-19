@@ -28,21 +28,20 @@
   "author": "m9tdev",
   "license": "MIT",
   "dependencies": {
-    "@prisma/generator-helper": "^7.0.1"
+    "@prisma/generator-helper": "^7.8.0"
   },
   "devDependencies": {
-    "@effect/platform": "^0.93.5",
-    "@effect/platform-node": "^0.102.0",
-    "@effect/vitest": "^0.27.0",
+    "@effect/platform-node": "4.0.0-beta.83",
+    "@effect/vitest": "4.0.0-beta.83",
     "@eslint/js": "^9.39.1",
-    "@prisma/adapter-better-sqlite3": "^7.0.1",
-    "@prisma/client": "^7.0.1",
+    "@prisma/adapter-better-sqlite3": "^7.8.0",
+    "@prisma/client": "^7.8.0",
     "@types/node": "^24.10.1",
-    "effect": "^3.19.8",
+    "effect": "4.0.0-beta.83",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "3.7.1",
-    "prisma": "^7.0.1",
+    "prisma": "^7.8.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.48.0",

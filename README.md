@@ -73,7 +73,7 @@ import { PrismaService } from "../../prisma/generated/effect";
 
 ### 1. Provide the Layer
 
-Initialize the `PrismaClient` and provide it to the `PrismaService.Default` layer as a `PrismaClientService`.
+Initialize the `PrismaClient` and provide it to the `PrismaService.layer` as a `PrismaClientService`.
 
 ```typescript
 import { Effect, Layer } from "effect";
@@ -82,7 +82,7 @@ import { PrismaService, PrismaClientService } from "~prisma/effect";
 // ... in your program
 const prisma = new PrismaClient({ adapter });
 const PrismaLayer = Layer.provide(
-  PrismaService.Default,
+  PrismaService.layer,
   Layer.succeed(PrismaClientService, prisma),
 );
 ```
