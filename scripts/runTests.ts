@@ -29,6 +29,21 @@ const program = Effect.gen(function* () {
   if (clean || !distExists) {
     yield* run(".", "npm", "run", "build");
   }
+  // tests/ is an isolated package with its own effect version (see
+  // tests/package.json), so it isn't covered by the root install. Install it on
+  // first run so `npm test` works after a plain clone. CI pre-installs the
+  // matrix effect version, which leaves tests/node_modules present, so this is
+  // skipped there and the chosen version is preserved.
+  const testDepsExist = yield* fs.exists("tests/node_modules");
+  if (!testDepsExist) {
+    yield* run(
+      "./tests",
+      "npm",
+      "install",
+      "--legacy-peer-deps",
+      "--no-package-lock",
+    );
+  }
   if (clean) {
     yield* run(".", "tsc", "--noEmit");
   }

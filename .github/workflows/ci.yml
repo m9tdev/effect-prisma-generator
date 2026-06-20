@@ -39,8 +39,12 @@ jobs:
         run: npm ci
 
       - name: Install test fixtures (effect ${{ matrix.effect }})
-        # --legacy-peer-deps keeps vitest from being duplicated into tests/;
-        # the vitest binary is provided by the root package.
+        # The test run must use a SINGLE vitest instance: tests/ provides
+        # `@effect/vitest` + `effect` (the matrix version), but the `vitest`
+        # binary and module come from the root package (pinned to a range both
+        # @effect/vitest legs accept). --legacy-peer-deps is intentional — it
+        # stops npm from auto-installing @effect/vitest's vitest peer into
+        # tests/, which would create a second, mismatched vitest instance.
         run: cd tests && npm install --no-save --no-package-lock --legacy-peer-deps effect@${{ matrix.effect }} @effect/vitest@${{ matrix.vitest }}
 
       - name: Run tests

@@ -17,6 +17,15 @@ function toCamelCase(str: string) {
 // matching whichever `effect` the consuming project has installed.
 type EffectMajor = 3 | 4;
 
+// Extract the supported EffectMajor from a version-ish string ("4.0.0-beta.83",
+// "^3.19", "10"). Reads the first run of digits as the major, so multi-digit
+// majors parse correctly; only a leading major of 4+ selects v4. Anything that
+// doesn't parse to >= 4 — including malformed values — falls back to v3, the
+// long-standing stable line.
+function majorOf(version: string): EffectMajor {
+  return Number(version.match(/\d+/)?.[0]) >= 4 ? 4 : 3;
+}
+
 // Resolve the consuming project's installed `effect` major version. Returns
 // `undefined` when `effect` can't be resolved, so callers can fall back.
 function resolveEffectMajor(searchPaths: string[]): EffectMajor | undefined {
@@ -27,7 +36,7 @@ function resolveEffectMajor(searchPaths: string[]): EffectMajor | undefined {
       paths: searchPaths,
     });
     const version: string = JSON.parse(readFileSync(pkgPath, "utf8")).version;
-    return Number(version.split(".")[0]) >= 4 ? 4 : 3;
+    return majorOf(version);
   } catch {
     return undefined;
   }
@@ -35,7 +44,7 @@ function resolveEffectMajor(searchPaths: string[]): EffectMajor | undefined {
 
 // Decide which effect major to target: an explicit `effectVersion` config wins,
 // otherwise auto-detect from the consumer's installed `effect`, otherwise fall
-// back to v3 (the long-standing stable line).
+// back to v3.
 function determineEffectMajor(
   configVersion: string | string[] | undefined,
   searchPaths: string[],
@@ -44,7 +53,7 @@ function determineEffectMajor(
     ? configVersion[0]
     : configVersion;
   if (typeof explicit === "string" && explicit.trim() !== "") {
-    return Number(explicit.replace(/[^\d]/g, "").charAt(0)) >= 4 ? 4 : 3;
+    return majorOf(explicit);
   }
   return resolveEffectMajor(searchPaths) ?? 3;
 }
@@ -373,7 +382,7 @@ function variantsFor(major: EffectMajor) {
       imports:
         `import { Cause, Context, Data, Effect, Exit, Option, Runtime } from "effect"\n` +
         `import { Service } from "effect/Effect"`,
-      tag: (self: string, type: string, id: string) =>
+      tag: (self: string, type: string, id: string = self) =>
         `Context.Tag("${id}")<\n  ${self},\n  ${type}\n>()`,
       serviceConstructor: `Service<PrismaService>()`,
       serviceConfigKey: "effect",
@@ -386,7 +395,7 @@ function variantsFor(major: EffectMajor) {
   }
   return {
     imports: `import { Cause, Context, Data, Effect, Exit, Layer, Option } from "effect"`,
-    tag: (self: string, type: string, id: string) =>
+    tag: (self: string, type: string, id: string = self) =>
       `Context.Service<\n  ${self},\n  ${type}\n>()("${id}")`,
     serviceConstructor: `Context.Service<PrismaService>()`,
     serviceConfigKey: "make",
@@ -417,9 +426,9 @@ async function generateUnifiedService(
 ${v.imports}
 import { Prisma, PrismaClient } from "${clientImportPath}"${runtimeImport}
 
-export class PrismaClientService extends ${v.tag("PrismaClientService", "PrismaClient", "PrismaClientService")} {}
+export class PrismaClientService extends ${v.tag("PrismaClientService", "PrismaClient")} {}
 
-export class PrismaTransactionClientService extends ${v.tag("PrismaTransactionClientService", "Prisma.TransactionClient", "PrismaTransactionClientService")} {}
+export class PrismaTransactionClientService extends ${v.tag("PrismaTransactionClientService", "Prisma.TransactionClient")} {}
 
 export class PrismaUniqueConstraintError extends Data.TaggedError("PrismaUniqueConstraintError")<{
   cause: Prisma.PrismaClientKnownRequestError

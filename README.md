@@ -237,3 +237,16 @@ const program = Effect.gen(function* () {
   );
 });
 ```
+
+## Development
+
+```bash
+npm install
+npm test
+```
+
+The integration tests under `tests/` are an isolated package with their own
+`effect` version, so the generator can be exercised against both Effect v3 and
+v4. `npm test` installs the `tests/` fixtures on first run (defaulting to the
+Effect v4 line); CI runs the suite against both majors via a matrix that swaps
+the `tests/` `effect` / `@effect/vitest` versions.
