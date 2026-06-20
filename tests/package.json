@@ -1,0 +1,12 @@
+{
+  "name": "effect-prisma-generator-tests",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Integration test fixtures for effect-prisma-generator. The effect / @effect/vitest versions here are swapped by CI to exercise the generator against both effect v3 and v4. The vitest/tsc/prisma binaries come from the root package.",
+  "devDependencies": {
+    "@effect/vitest": "4.0.0-beta.83",
+    "@prisma/adapter-better-sqlite3": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "effect": "4.0.0-beta.83"
+  }
+}
