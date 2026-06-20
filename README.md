@@ -21,6 +21,28 @@ pnpm add -D effect-prisma-generator
 yarn add -D effect-prisma-generator
 ```
 
+`effect` and `@prisma/client` are peer dependencies — install them in your project alongside Prisma.
+
+### Effect version support
+
+The generator supports both **Effect v3** and **Effect v4 (beta)** from a single package. It detects the `effect` version installed in your project and emits matching code, so you don't need a special install:
+
+- **Effect v3** → uses `Context.Tag` and the auto-generated `PrismaService.Default` layer.
+- **Effect v4** → uses `Context.Service` and exposes `PrismaService.layer`.
+
+> Effect v4 is still in beta and its APIs may shift between releases, so v4 output is considered experimental.
+
+If detection ever picks the wrong major (or `effect` can't be resolved — in which case it defaults to v3), set it explicitly in the generator block:
+
+```prisma
+generator effect {
+  provider         = "effect-prisma-generator"
+  output           = "./generated/effect.ts"
+  clientImportPath = "./client"
+  effectVersion    = "4" // "3" or "4"; omit to auto-detect
+}
+```
+
 ## Configuration
 
 Add the generator to your `schema.prisma` file:
@@ -73,7 +95,7 @@ import { PrismaService } from "../../prisma/generated/effect";
 
 ### 1. Provide the Layer
 
-Initialize the `PrismaClient` and provide it to the `PrismaService.Default` layer as a `PrismaClientService`.
+Initialize the `PrismaClient` and provide it to the generated `PrismaService` layer as a `PrismaClientService`. The layer accessor depends on your Effect version: `PrismaService.Default` on v3, `PrismaService.layer` on v4.
 
 ```typescript
 import { Effect, Layer } from "effect";
@@ -82,7 +104,7 @@ import { PrismaService, PrismaClientService } from "~prisma/effect";
 // ... in your program
 const prisma = new PrismaClient({ adapter });
 const PrismaLayer = Layer.provide(
-  PrismaService.Default,
+  PrismaService.Default, // on Effect v4, use PrismaService.layer
   Layer.succeed(PrismaClientService, prisma),
 );
 ```
@@ -215,3 +237,16 @@ const program = Effect.gen(function* () {
   );
 });
 ```
+
+## Development
+
+```bash
+npm install
+npm test
+```
+
+The integration tests under `tests/` are an isolated package with their own
+`effect` version, so the generator can be exercised against both Effect v3 and
+v4. `npm test` installs the `tests/` fixtures on first run (defaulting to the
+Effect v4 line); CI runs the suite against both majors via a matrix that swaps
+the `tests/` `effect` / `@effect/vitest` versions.

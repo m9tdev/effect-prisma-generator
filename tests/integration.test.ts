@@ -15,8 +15,14 @@ describe("Prisma Effect Generator", () => {
   const url = "file:prisma/dev.db";
   const adapter = new PrismaBetterSqlite3({ url });
   const prisma = new PrismaClient({ adapter });
+  // The generated PrismaService exposes its layer as `.Default` on effect v3
+  // and `.layer` on effect v4; pick whichever this leg's effect provides.
+  const { layer, Default } = PrismaService as unknown as {
+    layer?: Layer.Layer<PrismaService, never, PrismaClientService>;
+    Default?: Layer.Layer<PrismaService, never, PrismaClientService>;
+  };
   const MainLayer = Layer.provide(
-    PrismaService.Default,
+    (layer ?? Default)!,
     Layer.succeed(PrismaClientService, prisma),
   );
 

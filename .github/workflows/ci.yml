@@ -9,6 +9,22 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # The generator emits different code for effect v3 vs v4. Run the full
+    # integration suite against both: root deps (incl. the test harness) stay
+    # fixed, while tests/ — the code under test — installs the matrix effect.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: effect-v3
+            effect: "^3.19"
+            vitest: "^0.27"
+          - name: effect-v4
+            effect: "4.0.0-beta.83"
+            vitest: "4.0.0-beta.83"
+
+    name: test (${{ matrix.name }})
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -16,11 +32,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "npm"
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install test fixtures (effect ${{ matrix.effect }})
+        # The test run must use a SINGLE vitest instance: tests/ provides
+        # `@effect/vitest` + `effect` (the matrix version), but the `vitest`
+        # binary and module come from the root package (pinned to a range both
+        # @effect/vitest legs accept). --legacy-peer-deps is intentional — it
+        # stops npm from auto-installing @effect/vitest's vitest peer into
+        # tests/, which would create a second, mismatched vitest instance.
+        run: cd tests && npm install --no-save --no-package-lock --legacy-peer-deps effect@${{ matrix.effect }} @effect/vitest@${{ matrix.vitest }}
 
       - name: Run tests
         run: npm test
