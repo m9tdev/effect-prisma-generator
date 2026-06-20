@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.8.1...v0.9.0) (2026-06-20)
+
+
+### Features
+
+* support both Effect v3 and v4 from a single package ([#25](https://github.com/m9tdev/effect-prisma-generator/issues/25)) ([cabd063](https://github.com/m9tdev/effect-prisma-generator/commit/cabd063431c4cd408af12fc30475a9202f94f249))
+
 ## [0.8.1](https://github.com/m9tdev/effect-prisma-generator/compare/v0.8.0...v0.8.1) (2026-03-09)
 
 
