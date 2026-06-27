@@ -12,6 +12,11 @@ function toCamelCase(str: string) {
   return str.charAt(0).toLowerCase() + str.slice(1);
 }
 
+// Utility function to capitalize the first character (inverse of toCamelCase)
+function capitalize(str: string) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 // The major version of `effect` the generated code targets. v3 and v4 differ in
 // their service/runtime APIs (see `variantsFor`), so the generator emits code
 // matching whichever `effect` the consuming project has installed.
@@ -160,6 +165,8 @@ function generateModelOperations(models: DMMF.Model[]) {
     .map((model) => {
       const modelName = model.name;
       const modelNameCamel = toCamelCase(modelName);
+      // Prisma capitalizes the first letter only for *AggregateArgs / *GroupByOutputType
+      const modelNameCapitalized = capitalize(modelName);
 
       return `    ${modelNameCamel}: {
       findUnique: <T extends Prisma.${modelName}FindUniqueArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}FindUniqueArgs>) =>
@@ -283,7 +290,7 @@ function generateModelOperations(models: DMMF.Model[]) {
           }),
         ),
 
-      aggregate: <T extends Prisma.${modelName}AggregateArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}AggregateArgs>) =>
+      aggregate: <T extends Prisma.${modelNameCapitalized}AggregateArgs>(args: Prisma.SelectSubset<T, Prisma.${modelNameCapitalized}AggregateArgs>) =>
         Effect.flatMap(clientOrTx(client), client =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.aggregate(args),
@@ -352,18 +359,18 @@ function generateModelOperations(models: DMMF.Model[]) {
         Effect.flatMap(clientOrTx(client), client =>
           Effect.tryPromise({
             try: () => client.${modelNameCamel}.groupBy(args as any) as Prisma.PrismaPromise<
-              Array<Prisma.PickEnumerable<Prisma.${modelName}GroupByOutputType, T["by"]> & {
+              Array<Prisma.PickEnumerable<Prisma.${modelNameCapitalized}GroupByOutputType, T["by"]> & {
                   [P in keyof T &
-                    keyof Prisma.${modelName}GroupByOutputType]: P extends "_count"
+                    keyof Prisma.${modelNameCapitalized}GroupByOutputType]: P extends "_count"
                     ? T[P] extends boolean
                       ? number
                       : Prisma.GetScalarType<
                           T[P],
-                          Prisma.${modelName}GroupByOutputType[P]
+                          Prisma.${modelNameCapitalized}GroupByOutputType[P]
                         >
                     : Prisma.GetScalarType<
                         T[P],
-                        Prisma.${modelName}GroupByOutputType[P]
+                        Prisma.${modelNameCapitalized}GroupByOutputType[P]
                       >;
                 }>>,
             catch: (error) => mapFindError(error, "groupBy", "${modelName}")
