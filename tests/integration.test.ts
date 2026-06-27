@@ -309,4 +309,14 @@ describe("Prisma Effect Generator", () => {
     expect(generated).not.toContain("$queryRawTyped");
     expect(generated).not.toContain('import * as runtime from "@prisma/client/runtime/client"');
   });
+
+  it("should skip models with a required Unsupported field", () => {
+    const generated = fs.readFileSync("prisma/generated/effect.ts", "utf-8");
+    // Embedding has a required Unsupported("vector") field, so Prisma omits its
+    // create/upsert ops; the model must not be emitted in the service at all.
+    expect(generated).not.toContain("client.embedding.");
+    expect(generated).not.toContain("EmbeddingCreateArgs");
+    // Normal models are still emitted.
+    expect(generated).toContain("client.user.");
+  });
 });

@@ -28,3 +28,11 @@ model Post {
   authorId Int
   author   User    @relation(fields: [authorId], references: [id])
 }
+
+// A model with a required `Unsupported(...)` field. Prisma omits its
+// create/upsert operations (and their *Args types), so the generator must skip
+// it rather than emit operations that reference types Prisma never generated.
+model Embedding {
+  id     Int                   @id @default(autoincrement())
+  vector Unsupported("vector")
+}
