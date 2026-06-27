@@ -67,7 +67,23 @@ generatorHandler({
   },
 
   async onGenerate(options: GeneratorOptions) {
-    const models = options.dmmf.datamodel.models;
+    // A model with a required `Unsupported(...)` field (e.g. a pgvector `vector`
+    // column) cannot be created through the typed client, so Prisma omits its
+    // create/createMany/upsert operations and their `*Args` types. Emitting those
+    // operations anyway produces references to types/methods Prisma never created,
+    // so skip such models entirely. Detect them by the absence of the "create one"
+    // mapping, which Prisma exposes as `createOne` (Prisma 7+) or `create` (older).
+    const creatableModels = new Set(
+      options.dmmf.mappings.modelOperations
+        .filter((mapping) => {
+          const ops = mapping as { create?: string | null; createOne?: string | null };
+          return Boolean(ops.create ?? ops.createOne);
+        })
+        .map((mapping) => mapping.model),
+    );
+    const models = options.dmmf.datamodel.models.filter((model) =>
+      creatableModels.has(model.name),
+    );
     const outputPath = options.generator.output?.value;
     const clientImportPath = options.generator.config.clientImportPath;
 
