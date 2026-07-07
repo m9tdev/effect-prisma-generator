@@ -26,6 +26,15 @@ describe("Prisma Effect Generator", () => {
     Layer.succeed(PrismaClientService, prisma),
   );
 
+  it("marks generated implementation as ts-nocheck", () => {
+    const generatedSource = fs.readFileSync(
+      "prisma/generated/effect.ts",
+      "utf8",
+    );
+
+    expect(generatedSource).toContain("// @ts-nocheck");
+  });
+
   it.effect("should create and find a user", () =>
     Effect.gen(function* () {
       const prisma = yield* PrismaService;
@@ -260,9 +269,7 @@ describe("Prisma Effect Generator", () => {
       });
 
       // Use TypedSQL query
-      const users = yield* prisma.$queryRawTyped(
-        getUsersByName("%TypedSQL%"),
-      );
+      const users = yield* prisma.$queryRawTyped(getUsersByName("%TypedSQL%"));
 
       // Verify result
       expect(users.length).toBeGreaterThan(0);
@@ -301,12 +308,19 @@ describe("Prisma Effect Generator", () => {
   it("should include $queryRawTyped when typedSql preview feature is enabled", () => {
     const generated = fs.readFileSync("prisma/generated/effect.ts", "utf-8");
     expect(generated).toContain("$queryRawTyped");
-    expect(generated).toContain('import * as runtime from "@prisma/client/runtime/client"');
+    expect(generated).toContain(
+      'import * as runtime from "@prisma/client/runtime/client"',
+    );
   });
 
   it("should not include $queryRawTyped when typedSql preview feature is not enabled", () => {
-    const generated = fs.readFileSync("no-typedsql/generated/effect.ts", "utf-8");
+    const generated = fs.readFileSync(
+      "no-typedsql/generated/effect.ts",
+      "utf-8",
+    );
     expect(generated).not.toContain("$queryRawTyped");
-    expect(generated).not.toContain('import * as runtime from "@prisma/client/runtime/client"');
+    expect(generated).not.toContain(
+      'import * as runtime from "@prisma/client/runtime/client"',
+    );
   });
 });
