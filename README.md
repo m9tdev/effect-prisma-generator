@@ -140,10 +140,10 @@ in the service's types:
   the extended client directly (keep your own reference to it) for those
   queries.
 
-Also note that `PrismaClientService` is typed as `PrismaClientLike`, the
-structural subset of the client the service actually uses. Lifecycle methods
-such as `$disconnect()` are not part of that surface — call them on the
-client you constructed rather than on the service.
+`PrismaClientService` stays typed as `PrismaClient`, so lifecycle methods
+(`$disconnect()`, batch `$transaction`, ...) remain available through the
+service — extensions wrap the client rather than stripping it, so these work
+on extended clients too.
 
 ### 2. Use the Service
 

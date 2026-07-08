@@ -441,7 +441,7 @@ describe("Prisma Effect Generator", () => {
       $executeRaw: async () => undefined,
     };
     // @ts-expect-error — lacks the model delegate properties (user, post, ...),
-    // so it satisfies neither PrismaClientLike nor ExtendedPrismaClientLike.
+    // so it satisfies neither PrismaClient nor ExtendedPrismaClientLike.
     const layer = layerFromPrismaClient(wrongShapeClient);
     expect(layer).toBeDefined();
   });
