@@ -60,9 +60,17 @@ const program = Effect.gen(function* () {
   const generated = yield* fs.readFileString(
     "tests/prisma/generated/effect.ts",
   );
+  const stripped = generated.replace("// @ts-nocheck\n", "");
+  // If the directive text ever drifts from what we strip, the copy would stay
+  // suppressed and this safety net would silently stop checking anything.
+  if (stripped === generated) {
+    return yield* Effect.fail(
+      new Error("expected a // @ts-nocheck directive to strip from effect.ts"),
+    );
+  }
   yield* fs.writeFileString(
     "tests/prisma/generated/effect.checked.ts",
-    generated.replace("// @ts-nocheck\n", ""),
+    stripped,
   );
   yield* run("./tests", "tsc", "--noEmit");
   yield* run("./tests", "vitest", "run");
