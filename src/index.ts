@@ -261,10 +261,32 @@ function generateModelOperations(
         ? emitOp("upsert", "mapCreateError")
         : "";
 
+      const operations = [
+        emitOp("findUnique", "mapFindError"),
+        emitOp("findUniqueOrThrow", "mapFindOrThrowError"),
+        emitOp("findFirst", "mapFindError"),
+        emitOp("findFirstOrThrow", "mapFindOrThrowError"),
+        emitOp("findMany", "mapFindError"),
+        createOp,
+        createManyOp,
+        createManyAndReturnOp,
+        emitOp("delete", "mapDeleteError"),
+        emitOp("update", "mapUpdateError"),
+        emitOp("deleteMany", "mapDeleteManyError"),
+        emitOp("updateMany", "mapUpdateManyError"),
+        emitOp("updateManyAndReturn", "mapUpdateManyError"),
+        upsertOp,
+      ].join("");
+
+      const aggregations = [
+        emitOp("count", "mapFindError"),
+        emitOp("aggregate", "mapFindError"),
+      ].join("");
+
       return `    ${modelNameCamel}: {
-${emitOp("findUnique", "mapFindError")}${emitOp("findUniqueOrThrow", "mapFindOrThrowError")}${emitOp("findFirst", "mapFindError")}${emitOp("findFirstOrThrow", "mapFindOrThrowError")}${emitOp("findMany", "mapFindError")}${createOp}${createManyOp}${createManyAndReturnOp}${emitOp("delete", "mapDeleteError")}${emitOp("update", "mapUpdateError")}${emitOp("deleteMany", "mapDeleteManyError")}${emitOp("updateMany", "mapUpdateManyError")}${emitOp("updateManyAndReturn", "mapUpdateManyError")}${upsertOp}
+${operations}
       // Aggregation operations
-${emitOp("count", "mapFindError")}${emitOp("aggregate", "mapFindError")}
+${aggregations}
       // groupBy keeps the frozen-style signature: Prisma.Args<_, "groupBy">
       // cannot express the delegate's input validation (having/orderBy fields
       // must appear in "by"), which lives in the delegate's own generics.
