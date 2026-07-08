@@ -1,8 +1,7 @@
 // Type-level contract for the generated service's result types. These
 // assertions pin the shapes consumers rely on, so the emission style can
-// change (e.g. frozen *Args/SelectSubset -> Prisma.Args/Prisma.Result)
-// without silently changing what call sites infer. They bite in the suite's
-// `tsc --noEmit` step; the vitest run only confirms the file executes.
+// change without silently changing what call sites infer. They bite in the
+// suite's `tsc --noEmit` step; the vitest run only confirms the file executes.
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { Effect } from "effect";
 import { PrismaService } from "./prisma/generated/effect";
