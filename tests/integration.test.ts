@@ -128,6 +128,36 @@ describe("Prisma Effect Generator", () => {
     }).pipe(Effect.provide(MainLayer)),
   );
 
+  it.effect("should support aggregate and groupBy on a snake_case model", () =>
+    Effect.gen(function* () {
+      const prisma = yield* PrismaService;
+      yield* prisma.user_account.create({
+        data: { email: `acct-1-${Date.now()}@example.com`, score: 10 },
+      });
+      yield* prisma.user_account.create({
+        data: { email: `acct-2-${Date.now()}@example.com`, score: 20 },
+      });
+
+      const aggregate = yield* prisma.user_account.aggregate({
+        _sum: { score: true },
+        _avg: { score: true },
+      });
+      expect(aggregate._sum.score).toBe(30);
+      expect(aggregate._avg.score).toBe(15);
+
+      const grouped = yield* prisma.user_account.groupBy({
+        by: ["score"],
+        _count: true,
+        orderBy: { score: "asc" },
+      });
+      expect(grouped.length).toBe(2);
+      expect(grouped[0].score).toBe(10);
+      expect(grouped[1].score).toBe(20);
+
+      yield* prisma.user_account.deleteMany({});
+    }).pipe(Effect.provide(MainLayer)),
+  );
+
   it.effect("should support transactions", () =>
     Effect.gen(function* () {
       const prisma = yield* PrismaService;
