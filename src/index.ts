@@ -24,11 +24,6 @@ function toCamelCase(str: string) {
   return str.charAt(0).toLowerCase() + str.slice(1);
 }
 
-// Utility function to capitalize the first character (inverse of toCamelCase)
-function capitalize(str: string) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
 // The major version of `effect` the generated code targets. v3 and v4 differ in
 // their service/runtime APIs (see `variantsFor`), so the generator emits code
 // matching whichever `effect` the consuming project has installed.
@@ -215,8 +210,6 @@ function generateModelOperations(
     .map((model) => {
       const modelName = model.name;
       const modelNameCamel = toCamelCase(modelName);
-      // Prisma capitalizes the first letter only for *AggregateArgs / *GroupByOutputType
-      const modelNameCapitalized = capitalize(modelName);
       // A model with a required `Unsupported(...)` field (e.g. a pgvector
       // `vector` column) cannot be created through the typed client, so Prisma
       // omits its create/createMany/createManyAndReturn/upsert operations and
@@ -348,21 +341,7 @@ ${aggregations}
       >(args: Prisma.SubsetIntersection<T, Prisma.${modelName}GroupByArgs, OrderByArg> & InputErrors) =>
         Effect.flatMap(clientOrTx(client), client =>
           Effect.tryPromise({
-            try: () => client.${modelNameCamel}.groupBy(args as any) as Prisma.PrismaPromise<
-              Array<Prisma.PickEnumerable<Prisma.${modelNameCapitalized}GroupByOutputType, T["by"]> & {
-                  [P in keyof T &
-                    keyof Prisma.${modelNameCapitalized}GroupByOutputType]: P extends "_count"
-                    ? T[P] extends boolean
-                      ? number
-                      : Prisma.GetScalarType<
-                          T[P],
-                          Prisma.${modelNameCapitalized}GroupByOutputType[P]
-                        >
-                    : Prisma.GetScalarType<
-                        T[P],
-                        Prisma.${modelNameCapitalized}GroupByOutputType[P]
-                      >;
-                }>>,
+            try: (): Promise<Prisma.Result<PrismaClient["${modelNameCamel}"], T, "groupBy">> => (client.${modelNameCamel} as any).groupBy(args),
             catch: (error) => mapFindError(error, "groupBy", "${modelName}")
           }),
         ),
