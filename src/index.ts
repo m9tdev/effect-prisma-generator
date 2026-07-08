@@ -462,7 +462,7 @@ function variantsFor(major: EffectMajor) {
   if (major === 3) {
     return {
       imports:
-        `import { Cause, Context, Data, Effect, Exit, Option, Runtime } from "effect"\n` +
+        `import { Cause, Context, Data, Effect, Exit, Layer, Option, Runtime } from "effect"\n` +
         `import { Service } from "effect/Effect"`,
       tag: (self: string, type: string, id: string = self) =>
         `Context.Tag("${id}")<\n  ${self},\n  ${type}\n>()`,
@@ -511,6 +511,33 @@ ${v.imports}
 import { Prisma, PrismaClient } from "${clientImportPath}"${runtimeImport}
 
 export class PrismaClientService extends ${v.tag("PrismaClientService", "PrismaClient")} {}
+
+// A client created with client.$extends(...) (e.g. @prisma/extension-accelerate).
+// Its static type is not structurally compatible with PrismaClient — extended
+// delegates use different generic signatures — but at runtime every operation
+// this service uses remains available, as do $connect/$disconnect and batch
+// $transaction. The exception is $on, which Prisma strips from extended
+// clients (call it on the base client before $extends). Requiring every model
+// delegate property (via TypeMap) makes a client generated from a different
+// schema, or an incomplete mock, a compile error, while still accepting any
+// extension of this schema's client.
+export type ExtendedPrismaClientLike = {
+  $transaction(...args: ReadonlyArray<any>): Promise<any>
+  $queryRaw(...args: ReadonlyArray<any>): Promise<any>
+  $executeRaw(...args: ReadonlyArray<any>): Promise<any>
+} & {
+  [K in Prisma.TypeMap["meta"]["modelProps"]]: unknown
+}
+
+// Builds the PrismaClientService layer from a plain or extended client (#17).
+// The cast is sound at runtime (see ExtendedPrismaClientLike above), but an
+// extension's type-level changes (e.g. result extensions adding computed
+// fields, or extra query args like Accelerate's cacheStrategy) are not
+// reflected in the service's types; at runtime all operations go through the
+// extended client and behave per the extension.
+export const layerFromPrismaClient = (
+  client: PrismaClient | ExtendedPrismaClientLike,
+) => Layer.succeed(PrismaClientService, client as PrismaClient)
 
 export class PrismaTransactionClientService extends ${v.tag("PrismaTransactionClientService", "Prisma.TransactionClient")} {}
 

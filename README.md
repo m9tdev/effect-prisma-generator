@@ -109,6 +109,44 @@ const PrismaLayer = Layer.provide(
 );
 ```
 
+#### Extended clients (`$extends`)
+
+A client created with `client.$extends(...)` — for example with
+`@prisma/extension-accelerate` — has a static type that is not assignable to
+`PrismaClient`, so `Layer.succeed(PrismaClientService, extended)` does not
+typecheck. Use the generated `layerFromPrismaClient` instead, which accepts
+plain and extended clients:
+
+```typescript
+import { PrismaService, layerFromPrismaClient } from "~prisma/effect";
+import { withAccelerate } from "@prisma/extension-accelerate";
+
+const prisma = new PrismaClient().$extends(withAccelerate());
+const PrismaLayer = Layer.provide(
+  PrismaService.Default, // on Effect v4, use PrismaService.layer
+  layerFromPrismaClient(prisma),
+);
+```
+
+At runtime all operations go through the extended client and behave per the
+extension. Note that an extension's type-level changes are **not** reflected
+in the service's types:
+
+- Result extensions' computed fields don't appear on the service's return
+  types.
+- Extension-specific query arguments are rejected by the service's typed
+  methods — for Accelerate that means per-query caching config such as
+  `cacheStrategy` cannot be passed through the service without a cast; use
+  the extended client directly (keep your own reference to it) for those
+  queries.
+
+`PrismaClientService` stays typed as `PrismaClient`, so lifecycle methods
+remain available through the service — `$connect()`, `$disconnect()`, and
+batch `$transaction` all exist on extended clients too. The one exception is
+`$on`: Prisma strips event listening from extended clients, so call `$on` on
+the base client *before* `$extends` (per Prisma's own guidance) rather than
+through the service when it was provided an extended client.
+
 ### 2. Use the Service
 
 Access the `PrismaService` in your Effect programs.

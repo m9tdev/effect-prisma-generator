@@ -4,6 +4,7 @@ import { Data, Effect, Layer } from "effect";
 import * as fs from "fs";
 import { PrismaClient } from "./prisma/generated/client";
 import {
+  layerFromPrismaClient,
   PrismaClientService,
   PrismaService,
   PrismaTransactionClientService,
@@ -387,4 +388,61 @@ describe("Prisma Effect Generator", () => {
       expect(count).toBe(0);
     }).pipe(Effect.provide(MainLayer)),
   );
+
+  it.effect("should accept an extended client ($extends)", () =>
+    Effect.gen(function* () {
+      const prisma = yield* PrismaService;
+      const email = `extended-${Date.now()}@example.com`;
+
+      const user = yield* prisma.user.create({
+        data: { email, name: "Extended User" },
+      });
+      expect(user.email).toBe(email);
+
+      // Transactions must work through the extended client too.
+      yield* prisma.$transaction(
+        prisma.user.update({
+          where: { id: user.id },
+          data: { name: "Extended User 2" },
+        }),
+      );
+      const found = yield* prisma.user.findUniqueOrThrow({
+        where: { id: user.id },
+      });
+      expect(found.name).toBe("Extended User 2");
+
+      yield* prisma.user.delete({ where: { id: user.id } });
+    }).pipe(
+      Effect.provide(
+        Layer.provide(
+          (layer ?? Default)!,
+          // Extended clients have type DynamicClientExtensionThis, which is
+          // not assignable to PrismaClient; layerFromPrismaClient must accept
+          // one without casts on the consumer side (#17).
+          layerFromPrismaClient(
+            prisma.$extends({
+              name: "test-extension",
+              query: {
+                $allModels: {
+                  $allOperations: ({ args, query }) => query(args),
+                },
+              },
+            }),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  it("should reject clients missing this schema's model delegates at compile time", () => {
+    const wrongShapeClient = {
+      $transaction: async () => undefined,
+      $queryRaw: async () => undefined,
+      $executeRaw: async () => undefined,
+    };
+    // @ts-expect-error — lacks the model delegate properties (user, post, ...),
+    // so it satisfies neither PrismaClient nor ExtendedPrismaClientLike.
+    const layer = layerFromPrismaClient(wrongShapeClient);
+    expect(layer).toBeDefined();
+  });
 });
