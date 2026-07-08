@@ -53,6 +53,17 @@ const program = Effect.gen(function* () {
   }
   yield* run("./tests", "prisma", "generate", "--sql");
   yield* run("./tests/no-typedsql", "prisma", "generate");
+  // tsc has no flag to override `// @ts-nocheck`, so the suppressed default
+  // output would go unchecked. Type-check a copy with the directive stripped,
+  // placed next to the original so its relative imports still resolve; the
+  // tests tsconfig picks it up via its `**/*` include.
+  const generated = yield* fs.readFileString(
+    "tests/prisma/generated/effect.ts",
+  );
+  yield* fs.writeFileString(
+    "tests/prisma/generated/effect.checked.ts",
+    generated.replace("// @ts-nocheck\n", ""),
+  );
   yield* run("./tests", "tsc", "--noEmit");
   yield* run("./tests", "vitest", "run");
 }).pipe(
