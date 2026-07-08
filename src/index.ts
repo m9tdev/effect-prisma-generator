@@ -778,15 +778,28 @@ const mapUpdateManyError = (error: unknown, operation: string, model: string): P
   throw error;
 }
 
+// The operations the service wraps; the untyped-return view below checks each
+// call's argument against this operation's input type.
+type ServiceOperation =
+  | "findUnique" | "findUniqueOrThrow" | "findFirst" | "findFirstOrThrow"
+  | "findMany" | "create" | "createMany" | "createManyAndReturn" | "delete"
+  | "update" | "deleteMany" | "updateMany" | "updateManyAndReturn" | "upsert"
+  | "count" | "aggregate" | "groupBy"
+
 // The view of the client that operations call delegates through: model and
-// method names stay checked, but the calls themselves are untyped — a
+// method names stay checked, and each call's argument is checked against the
+// operation's real input type — only the returns are untyped, because a
 // delegate's own generics cannot bind the service's type parameter, so each
 // operation's declared Result<> return carries the types instead. Direct
 // function properties ($queryRaw, $transaction, ...) keep their real types.
 type LooseDelegates = {
   [K in keyof Prisma.TransactionClient]: Prisma.TransactionClient[K] extends (...args: never) => unknown
     ? Prisma.TransactionClient[K]
-    : { [M in keyof Prisma.TransactionClient[K]]: (args?: unknown) => Promise<any> }
+    : {
+        [M in keyof Prisma.TransactionClient[K]]: M extends ServiceOperation
+          ? (args: Prisma.Args<Prisma.TransactionClient[K], M>) => Promise<any>
+          : (args?: unknown) => Promise<any>
+      }
 }
 
 const clientOrTx = (client: PrismaClient) => Effect.map(

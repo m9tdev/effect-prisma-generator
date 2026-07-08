@@ -2,6 +2,8 @@
 // assertions pin the shapes consumers rely on, so the emission style can
 // change without silently changing what call sites infer. They bite in the
 // suite's `tsc --noEmit` step; the vitest run only confirms the file executes.
+/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any --
+   type-level assertions produce type-only values and infer through any */
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { Effect } from "effect";
 import { PrismaService } from "./prisma/generated/effect";
@@ -174,10 +176,18 @@ const _typeAssertions = () => {
   const emb = svc.embedding.findMany({});
   expectTypeOf<Ok<typeof emb>>().toEqualTypeOf<Array<{ id: number }>>();
   type EmbeddingOps = keyof Svc["embedding"];
-  expectTypeOf<"create" extends EmbeddingOps ? true : false>().toEqualTypeOf<false>();
-  expectTypeOf<"createMany" extends EmbeddingOps ? true : false>().toEqualTypeOf<false>();
-  expectTypeOf<"upsert" extends EmbeddingOps ? true : false>().toEqualTypeOf<false>();
-  expectTypeOf<"findMany" extends EmbeddingOps ? true : false>().toEqualTypeOf<true>();
+  expectTypeOf<
+    "create" extends EmbeddingOps ? true : false
+  >().toEqualTypeOf<false>();
+  expectTypeOf<
+    "createMany" extends EmbeddingOps ? true : false
+  >().toEqualTypeOf<false>();
+  expectTypeOf<
+    "upsert" extends EmbeddingOps ? true : false
+  >().toEqualTypeOf<false>();
+  expectTypeOf<
+    "findMany" extends EmbeddingOps ? true : false
+  >().toEqualTypeOf<true>();
 
   // Strictness: unknown/excess properties are rejected, in fresh literals
   // and — via Prisma.Exact — in widened non-literal args too.
