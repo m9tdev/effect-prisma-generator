@@ -11,6 +11,10 @@ generator effect {
   provider         = "node ../../dist/index.js"
   output           = "./generated/effect.ts"
   clientImportPath = "./client"
+  // Opting out here keeps one leg of the suite type-checking the generated
+  // output (via `tsc --noEmit` over tests/), so generator regressions that
+  // emit type-invalid code are still caught.
+  noCheck        = "false"
 }
 
 model User {
