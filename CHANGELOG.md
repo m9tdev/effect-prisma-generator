@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.10.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.9.0...v0.10.0) (2026-07-08)
+
+
+### Features
+
+* add noCheck generator option ([ba30306](https://github.com/m9tdev/effect-prisma-generator/commit/ba30306f24d8292fd57802ca32548ff310901928))
+
+
+### Bug Fixes
+
+* correct aggregate/groupBy type names for lower-cased models ([c35cd02](https://github.com/m9tdev/effect-prisma-generator/commit/c35cd02cac36ead3d22ac2b291a92ddba2cf958f))
+* omit create operations for models with a required Unsupported field ([33fb5d3](https://github.com/m9tdev/effect-prisma-generator/commit/33fb5d31b9246b0583d58bf3c5049d890c9e3608))
+
+
+### Performance Improvements
+
+* add ts-nocheck directive to generated output ([74fefb2](https://github.com/m9tdev/effect-prisma-generator/commit/74fefb2d2031b2980ca99aa25b6edd719242809f)), closes [#29](https://github.com/m9tdev/effect-prisma-generator/issues/29)
+
 ## [0.9.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.8.1...v0.9.0) (2026-06-20)
 
 
