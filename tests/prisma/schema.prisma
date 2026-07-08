@@ -29,6 +29,15 @@ model Post {
   author   User    @relation(fields: [authorId], references: [id])
 }
 
+// A model with a required `Unsupported(...)` field. Prisma omits its
+// create/createMany/createManyAndReturn/upsert operations (and their *Args
+// types), so the generator must omit those operations too while keeping the
+// rest of the model in the service.
+model Embedding {
+  id     Int                   @id @default(autoincrement())
+  vector Unsupported("vector")
+}
+
 // snake_case model name: regression coverage for first-letter-capitalized Prisma types
 model user_account {
   id    Int    @id @default(autoincrement())

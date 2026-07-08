@@ -361,4 +361,30 @@ describe("Prisma Effect Generator", () => {
     expect(generated).not.toContain("$queryRawTyped");
     expect(generated).not.toContain('import * as runtime from "@prisma/client/runtime/client"');
   });
+
+  it("should omit create operations for models with a required Unsupported field", () => {
+    const generated = fs.readFileSync("prisma/generated/effect.ts", "utf-8");
+    // Embedding has a required Unsupported("vector") field, so Prisma omits its
+    // create/createMany/createManyAndReturn/upsert ops and their *Args types;
+    // the service must skip those operations but keep the rest of the model.
+    expect(generated).not.toContain("EmbeddingCreateArgs");
+    expect(generated).not.toContain("EmbeddingCreateManyArgs");
+    expect(generated).not.toContain("EmbeddingCreateManyAndReturnArgs");
+    expect(generated).not.toContain("EmbeddingUpsertArgs");
+    expect(generated).toContain("client.embedding.findMany");
+    expect(generated).toContain("client.embedding.update");
+    expect(generated).toContain("client.embedding.aggregate");
+    // Normal models keep their create operations.
+    expect(generated).toContain("client.user.create");
+  });
+
+  it.effect("should read and aggregate a model with a required Unsupported field", () =>
+    Effect.gen(function* () {
+      const prisma = yield* PrismaService;
+      const rows = yield* prisma.embedding.findMany({});
+      expect(rows).toEqual([]);
+      const count = yield* prisma.embedding.count({});
+      expect(count).toBe(0);
+    }).pipe(Effect.provide(MainLayer)),
+  );
 });

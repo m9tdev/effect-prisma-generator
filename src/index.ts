@@ -147,6 +147,7 @@ generatorHandler({
 
     await generateUnifiedService(
       [...models],
+      options.dmmf.mappings.modelOperations,
       outputPath,
       clientImportPath,
       hasTypedSql,
@@ -203,13 +204,76 @@ function generateRawSqlOperations(hasTypedSql: boolean) {
       ),${typedSqlOperation}`;
 }
 
-function generateModelOperations(models: DMMF.Model[]) {
+function generateModelOperations(
+  models: DMMF.Model[],
+  modelOperations: DMMF.Mappings["modelOperations"],
+) {
+  const mappingByModel = new Map(
+    modelOperations.map((m) => [m.model, m as Record<string, unknown>]),
+  );
   return models
     .map((model) => {
       const modelName = model.name;
       const modelNameCamel = toCamelCase(modelName);
       // Prisma capitalizes the first letter only for *AggregateArgs / *GroupByOutputType
       const modelNameCapitalized = capitalize(modelName);
+      // A model with a required `Unsupported(...)` field (e.g. a pgvector
+      // `vector` column) cannot be created through the typed client, so Prisma
+      // omits its create/createMany/createManyAndReturn/upsert operations and
+      // their `*Args` types. Emit each operation only when its DMMF mapping
+      // exists; Prisma 7 names the single-record mappings `createOne`/
+      // `upsertOne`, older majors used `create`/`upsert`.
+      const mapping = mappingByModel.get(modelName) ?? {};
+      const hasOp = (...keys: string[]) =>
+        keys.some((key) => Boolean(mapping[key]));
+
+      const createOp = hasOp("createOne", "create")
+        ? `
+      create: <T extends Prisma.${modelName}CreateArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}CreateArgs>) =>
+        Effect.flatMap(clientOrTx(client), client =>
+          Effect.tryPromise({
+            try: () => client.${modelNameCamel}.create(args),
+            catch: (error) => mapCreateError(error, "create", "${modelName}")
+          }),
+        ),
+`
+        : "";
+
+      const createManyOp = hasOp("createMany")
+        ? `
+      createMany: <T extends Prisma.${modelName}CreateManyArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}CreateManyArgs>) =>
+        Effect.flatMap(clientOrTx(client), client =>
+          Effect.tryPromise({
+            try: () => client.${modelNameCamel}.createMany(args),
+            catch: (error) => mapCreateError(error, "createMany", "${modelName}")
+          }),
+        ),
+`
+        : "";
+
+      const createManyAndReturnOp = hasOp("createManyAndReturn")
+        ? `
+      createManyAndReturn: <T extends Prisma.${modelName}CreateManyAndReturnArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}CreateManyAndReturnArgs>) =>
+        Effect.flatMap(clientOrTx(client), client =>
+          Effect.tryPromise({
+            try: () => client.${modelNameCamel}.createManyAndReturn(args),
+            catch: (error) => mapCreateError(error, "createManyAndReturn", "${modelName}")
+          }),
+        ),
+`
+        : "";
+
+      const upsertOp = hasOp("upsertOne", "upsert")
+        ? `
+      upsert: <T extends Prisma.${modelName}UpsertArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}UpsertArgs>) =>
+        Effect.flatMap(clientOrTx(client), client =>
+          Effect.tryPromise({
+            try: () => client.${modelNameCamel}.upsert(args),
+            catch: (error) => mapCreateError(error, "upsert", "${modelName}")
+          }),
+        ),
+`
+        : "";
 
       return `    ${modelNameCamel}: {
       findUnique: <T extends Prisma.${modelName}FindUniqueArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}FindUniqueArgs>) =>
@@ -251,31 +315,7 @@ function generateModelOperations(models: DMMF.Model[]) {
             catch: (error) => mapFindError(error, "findMany", "${modelName}")
           }),
         ),
-
-      create: <T extends Prisma.${modelName}CreateArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}CreateArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.create(args),
-            catch: (error) => mapCreateError(error, "create", "${modelName}")
-          }),
-        ),
-
-      createMany: <T extends Prisma.${modelName}CreateManyArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}CreateManyArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.createMany(args),
-            catch: (error) => mapCreateError(error, "createMany", "${modelName}")
-          }),
-        ),
-
-      createManyAndReturn: <T extends Prisma.${modelName}CreateManyAndReturnArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}CreateManyAndReturnArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.createManyAndReturn(args),
-            catch: (error) => mapCreateError(error, "createManyAndReturn", "${modelName}")
-          }),
-        ),
-
+${createOp}${createManyOp}${createManyAndReturnOp}
       delete: <T extends Prisma.${modelName}DeleteArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}DeleteArgs>) =>
         Effect.flatMap(clientOrTx(client), client =>
           Effect.tryPromise({
@@ -315,15 +355,7 @@ function generateModelOperations(models: DMMF.Model[]) {
             catch: (error) => mapUpdateManyError(error, "updateManyAndReturn", "${modelName}")
           }),
         ),
-
-      upsert: <T extends Prisma.${modelName}UpsertArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}UpsertArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.upsert(args),
-            catch: (error) => mapCreateError(error, "upsert", "${modelName}")
-          }),
-        ),
-
+${upsertOp}
       // Aggregation operations
       count: <T extends Prisma.${modelName}CountArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}CountArgs>) =>
         Effect.flatMap(clientOrTx(client), client =>
@@ -459,6 +491,7 @@ function variantsFor(major: EffectMajor) {
 
 async function generateUnifiedService(
   models: DMMF.Model[],
+  mappings: DMMF.Mappings["modelOperations"],
   outputPath: string,
   clientImportPath: string,
   hasTypedSql: boolean,
@@ -466,7 +499,7 @@ async function generateUnifiedService(
   noCheck: boolean,
 ) {
   const rawSqlOperations = generateRawSqlOperations(hasTypedSql);
-  const modelOperations = generateModelOperations(models);
+  const modelOperations = generateModelOperations(models, mappings);
   const v = variantsFor(major);
 
   const runtimeImport = hasTypedSql
