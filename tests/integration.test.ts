@@ -26,13 +26,26 @@ describe("Prisma Effect Generator", () => {
     Layer.succeed(PrismaClientService, prisma),
   );
 
-  it("marks generated implementation as ts-nocheck", () => {
+  it("suppresses type checking and linting in generated output by default", () => {
     const generatedSource = fs.readFileSync(
       "prisma/generated/effect.ts",
       "utf8",
     );
 
     expect(generatedSource).toContain("// @ts-nocheck");
+    expect(generatedSource).toContain("/* eslint-disable */");
+    expect(generatedSource).toContain("// biome-ignore-all lint");
+  });
+
+  it("omits suppression directives when noCheck = false", () => {
+    const generatedSource = fs.readFileSync(
+      "no-typedsql/generated/effect.ts",
+      "utf8",
+    );
+
+    expect(generatedSource).not.toContain("// @ts-nocheck");
+    expect(generatedSource).not.toContain("eslint-disable");
+    expect(generatedSource).not.toContain("biome-ignore");
   });
 
   it.effect("should create and find a user", () =>

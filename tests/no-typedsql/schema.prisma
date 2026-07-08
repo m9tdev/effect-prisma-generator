@@ -11,6 +11,11 @@ generator effect {
   provider         = "node ../../dist/index.js"
   output           = "./generated/effect.ts"
   clientImportPath = "./client"
+  // Exercises the noCheck = "false" path: this leg's output carries no
+  // suppression directives, so the suite's `tsc --noEmit` checks it as-is.
+  // (The default-path output is checked too, via the directive-stripped
+  // effect.checked.ts copy written by scripts/runTests.ts.)
+  noCheck        = "false"
 }
 
 model User {
