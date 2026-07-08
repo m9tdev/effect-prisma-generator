@@ -428,7 +428,7 @@ describe("Prisma Effect Generator", () => {
           serviceLayer,
           // Extended clients have type DynamicClientExtensionThis, which is
           // not assignable to PrismaClient; layerFromPrismaClient must accept
-          // one without casts on the consumer side (#17).
+          // one without casts on the consumer side.
           layerFromPrismaClient(
             prisma.$extends({
               name: "test-extension",

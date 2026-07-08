@@ -8,7 +8,7 @@ import path from "path";
 // The suppression directives exempt the generated implementation from type
 // checking and linting, mirroring Prisma's own generated client header.
 // `// @ts-nocheck` originally avoided a large type-instantiation cost on big
-// schemas (#29); since the Prisma.Args/Result emission the bodies are cheap
+// schemas; since the Prisma.Args/Result emission the bodies are cheap
 // casts and it mostly insures against consumer tsconfig variations
 // (exactOptionalPropertyTypes etc.) the generated code isn't tested under.
 // Exported signatures still type-check consumer call sites either way.
@@ -446,7 +446,7 @@ export type ExtendedPrismaClientLike = {
   [K in Prisma.TypeMap["meta"]["modelProps"]]: unknown
 }
 
-// Builds the PrismaClientService layer from a plain or extended client (#17).
+// Builds the PrismaClientService layer from a plain or extended client.
 // The cast is sound at runtime (see ExtendedPrismaClientLike above), but an
 // extension's type-level changes (e.g. result extensions adding computed
 // fields, or extra query args like Accelerate's cacheStrategy) are not

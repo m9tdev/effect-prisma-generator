@@ -136,7 +136,8 @@ const _typeAssertions = () => {
     _max: { email: string | null };
   }>();
 
-  // aggregate on the snake_case model (the #27 capitalization territory)
+  // aggregate on the snake_case model, where Prisma capitalizes the first
+  // letter of the generated type names
   const aggSnake = svc.user_account.aggregate({
     _avg: { score: true },
     _sum: { score: true },
