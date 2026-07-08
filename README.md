@@ -141,9 +141,11 @@ in the service's types:
   queries.
 
 `PrismaClientService` stays typed as `PrismaClient`, so lifecycle methods
-(`$disconnect()`, batch `$transaction`, ...) remain available through the
-service — extensions wrap the client rather than stripping it, so these work
-on extended clients too.
+remain available through the service — `$connect()`, `$disconnect()`, and
+batch `$transaction` all exist on extended clients too. The one exception is
+`$on`: Prisma strips event listening from extended clients, so call `$on` on
+the base client *before* `$extends` (per Prisma's own guidance) rather than
+through the service when it was provided an extended client.
 
 ### 2. Use the Service
 

@@ -514,9 +514,10 @@ export class PrismaClientService extends ${v.tag("PrismaClientService", "PrismaC
 
 // A client created with client.$extends(...) (e.g. @prisma/extension-accelerate).
 // Its static type is not structurally compatible with PrismaClient — extended
-// delegates use different generic signatures — but at runtime an extension
-// wraps the client rather than stripping it, so every operation this service
-// uses (and the lifecycle methods) remain available. Requiring every model
+// delegates use different generic signatures — but at runtime every operation
+// this service uses remains available, as do $connect/$disconnect and batch
+// $transaction. The exception is $on, which Prisma strips from extended
+// clients (call it on the base client before $extends). Requiring every model
 // delegate property (via TypeMap) makes a client generated from a different
 // schema, or an incomplete mock, a compile error, while still accepting any
 // extension of this schema's client.
