@@ -233,7 +233,7 @@ function generateModelOperations(
       ${opName}: <A extends Prisma.Args<PrismaClient["${modelNameCamel}"], "${opName}">>(args: Prisma.SelectSubset<A, Prisma.Args<PrismaClient["${modelNameCamel}"], "${opName}">>) =>
         Effect.flatMap(clientOrTx(client), client =>
           Effect.tryPromise({
-            try: (): Promise<Prisma.Result<PrismaClient["${modelNameCamel}"], A, "${opName}">> => (client.${modelNameCamel} as any).${opName}(args),
+            try: (): Promise<Prisma.Result<PrismaClient["${modelNameCamel}"], A, "${opName}">> => client.${modelNameCamel}.${opName}(args),
             catch: (error) => ${errorMapper}(error, "${opName}", "${modelName}")
           }),
         ),
@@ -341,7 +341,7 @@ ${aggregations}
       >(args: Prisma.SubsetIntersection<T, Prisma.${modelName}GroupByArgs, OrderByArg> & InputErrors) =>
         Effect.flatMap(clientOrTx(client), client =>
           Effect.tryPromise({
-            try: (): Promise<Prisma.Result<PrismaClient["${modelNameCamel}"], T, "groupBy">> => (client.${modelNameCamel} as any).groupBy(args),
+            try: (): Promise<Prisma.Result<PrismaClient["${modelNameCamel}"], T, "groupBy">> => client.${modelNameCamel}.groupBy(args),
             catch: (error) => mapFindError(error, "groupBy", "${modelName}")
           }),
         ),
@@ -778,9 +778,20 @@ const mapUpdateManyError = (error: unknown, operation: string, model: string): P
   throw error;
 }
 
+// The view of the client that operations call delegates through: model and
+// method names stay checked, but the calls themselves are untyped — a
+// delegate's own generics cannot bind the service's type parameter, so each
+// operation's declared Result<> return carries the types instead. Direct
+// function properties ($queryRaw, $transaction, ...) keep their real types.
+type LooseDelegates = {
+  [K in keyof Prisma.TransactionClient]: Prisma.TransactionClient[K] extends (...args: never) => unknown
+    ? Prisma.TransactionClient[K]
+    : { [M in keyof Prisma.TransactionClient[K]]: (args?: unknown) => Promise<any> }
+}
+
 const clientOrTx = (client: PrismaClient) => Effect.map(
   Effect.serviceOption(PrismaTransactionClientService),
-  Option.getOrElse(() => client),
+  (tx) => Option.getOrElse(tx, () => client) as unknown as LooseDelegates,
 );
 
 export class PrismaService extends ${v.serviceConstructor}("PrismaService", {

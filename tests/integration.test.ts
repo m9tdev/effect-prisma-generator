@@ -377,14 +377,14 @@ describe("Prisma Effect Generator", () => {
     // Embedding has a required Unsupported("vector") field, so Prisma omits its
     // create/createMany/createManyAndReturn/upsert ops and their *Args types;
     // the service must skip those operations but keep the rest of the model.
-    expect(generated).not.toContain('(client.embedding as any).create');
-    expect(generated).not.toContain('(client.embedding as any).createMany');
-    expect(generated).not.toContain('(client.embedding as any).upsert');
-    expect(generated).toContain('(client.embedding as any).findMany');
-    expect(generated).toContain('(client.embedding as any).update');
-    expect(generated).toContain('(client.embedding as any).aggregate');
+    expect(generated).not.toContain('client.embedding.create');
+    expect(generated).not.toContain('client.embedding.createMany');
+    expect(generated).not.toContain('client.embedding.upsert');
+    expect(generated).toContain('client.embedding.findMany');
+    expect(generated).toContain('client.embedding.update');
+    expect(generated).toContain('client.embedding.aggregate');
     // Normal models keep their create operations.
-    expect(generated).toContain('(client.user as any).create');
+    expect(generated).toContain('client.user.create');
   });
 
   it.effect(
