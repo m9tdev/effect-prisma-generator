@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  format:
+  lint:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,6 +24,9 @@ jobs:
 
       - name: Check formatting
         run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
 
   test:
     runs-on: ubuntu-latest

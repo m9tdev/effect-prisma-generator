@@ -22,8 +22,12 @@ describe("Prisma Effect Generator", () => {
     layer?: Layer.Layer<PrismaService, never, PrismaClientService>;
     Default?: Layer.Layer<PrismaService, never, PrismaClientService>;
   };
+  const serviceLayer = layer ?? Default;
+  if (serviceLayer === undefined) {
+    throw new Error("PrismaService exposes neither .layer nor .Default");
+  }
   const MainLayer = Layer.provide(
-    (layer ?? Default)!,
+    serviceLayer,
     Layer.succeed(PrismaClientService, prisma),
   );
 
@@ -422,7 +426,7 @@ describe("Prisma Effect Generator", () => {
     }).pipe(
       Effect.provide(
         Layer.provide(
-          (layer ?? Default)!,
+          serviceLayer,
           // Extended clients have type DynamicClientExtensionThis, which is
           // not assignable to PrismaClient; layerFromPrismaClient must accept
           // one without casts on the consumer side (#17).
