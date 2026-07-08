@@ -144,7 +144,7 @@ in the service's types:
 remain available through the service — `$connect()`, `$disconnect()`, and
 batch `$transaction` all exist on extended clients too. The one exception is
 `$on`: Prisma strips event listening from extended clients, so call `$on` on
-the base client *before* `$extends` (per Prisma's own guidance) rather than
+the base client _before_ `$extends` (per Prisma's own guidance) rather than
 through the service when it was provided an extended client.
 
 ### 2. Use the Service

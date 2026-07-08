@@ -22,8 +22,12 @@ describe("Prisma Effect Generator", () => {
     layer?: Layer.Layer<PrismaService, never, PrismaClientService>;
     Default?: Layer.Layer<PrismaService, never, PrismaClientService>;
   };
+  const serviceLayer = layer ?? Default;
+  if (serviceLayer === undefined) {
+    throw new Error("PrismaService exposes neither .layer nor .Default");
+  }
   const MainLayer = Layer.provide(
-    (layer ?? Default)!,
+    serviceLayer,
     Layer.succeed(PrismaClientService, prisma),
   );
 
@@ -313,9 +317,7 @@ describe("Prisma Effect Generator", () => {
       });
 
       // Use TypedSQL query
-      const users = yield* prisma.$queryRawTyped(
-        getUsersByName("%TypedSQL%"),
-      );
+      const users = yield* prisma.$queryRawTyped(getUsersByName("%TypedSQL%"));
 
       // Verify result
       expect(users.length).toBeGreaterThan(0);
@@ -354,13 +356,20 @@ describe("Prisma Effect Generator", () => {
   it("should include $queryRawTyped when typedSql preview feature is enabled", () => {
     const generated = fs.readFileSync("prisma/generated/effect.ts", "utf-8");
     expect(generated).toContain("$queryRawTyped");
-    expect(generated).toContain('import * as runtime from "@prisma/client/runtime/client"');
+    expect(generated).toContain(
+      'import * as runtime from "@prisma/client/runtime/client"',
+    );
   });
 
   it("should not include $queryRawTyped when typedSql preview feature is not enabled", () => {
-    const generated = fs.readFileSync("no-typedsql/generated/effect.ts", "utf-8");
+    const generated = fs.readFileSync(
+      "no-typedsql/generated/effect.ts",
+      "utf-8",
+    );
     expect(generated).not.toContain("$queryRawTyped");
-    expect(generated).not.toContain('import * as runtime from "@prisma/client/runtime/client"');
+    expect(generated).not.toContain(
+      'import * as runtime from "@prisma/client/runtime/client"',
+    );
   });
 
   it("should omit create operations for models with a required Unsupported field", () => {
@@ -379,14 +388,16 @@ describe("Prisma Effect Generator", () => {
     expect(generated).toContain("client.user.create");
   });
 
-  it.effect("should read and aggregate a model with a required Unsupported field", () =>
-    Effect.gen(function* () {
-      const prisma = yield* PrismaService;
-      const rows = yield* prisma.embedding.findMany({});
-      expect(rows).toEqual([]);
-      const count = yield* prisma.embedding.count({});
-      expect(count).toBe(0);
-    }).pipe(Effect.provide(MainLayer)),
+  it.effect(
+    "should read and aggregate a model with a required Unsupported field",
+    () =>
+      Effect.gen(function* () {
+        const prisma = yield* PrismaService;
+        const rows = yield* prisma.embedding.findMany({});
+        expect(rows).toEqual([]);
+        const count = yield* prisma.embedding.count({});
+        expect(count).toBe(0);
+      }).pipe(Effect.provide(MainLayer)),
   );
 
   it.effect("should accept an extended client ($extends)", () =>
@@ -415,7 +426,7 @@ describe("Prisma Effect Generator", () => {
     }).pipe(
       Effect.provide(
         Layer.provide(
-          (layer ?? Default)!,
+          serviceLayer,
           // Extended clients have type DynamicClientExtensionThis, which is
           // not assignable to PrismaClient; layerFromPrismaClient must accept
           // one without casts on the consumer side (#17).
