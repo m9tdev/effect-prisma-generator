@@ -132,6 +132,8 @@ generatorHandler({
       [outputDir, process.cwd()],
     );
 
+    // Intentionally undocumented escape hatch: this repo's test suite sets
+    // noCheck = "false" to type-check generated output as-is.
     const noCheck = parseBooleanConfig(
       options.generator.config.noCheck,
       "noCheck",

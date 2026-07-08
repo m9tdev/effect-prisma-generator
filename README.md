@@ -63,32 +63,6 @@ generator effect {
 
 Then run `prisma generate` to generate the client and the Effect service.
 
-### noCheck (optional)
-
-By default the generated file starts with suppression directives that exempt
-it from type checking and linting, the same header Prisma uses for its own
-generated client:
-
-```ts
-/* eslint-disable */
-// biome-ignore-all lint: generated file
-// @ts-nocheck
-```
-
-The `// @ts-nocheck` in particular matters on large schemas: it avoids a major
-type-checking cost (hundreds of millions of type instantiations), while
-consumer call sites remain fully typed through the exported signatures. Set
-`noCheck = "false"` to type-check and lint the generated file anyway:
-
-```prisma
-generator effect {
-  provider         = "effect-prisma-generator"
-  output           = "./generated/effect.ts"
-  clientImportPath = "./client"
-  noCheck          = "false" // defaults to "true"
-}
-```
-
 ### Recommendation (optional)
 
 Add the following to your `tsconfig.json`:
