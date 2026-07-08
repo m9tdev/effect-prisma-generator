@@ -402,7 +402,8 @@ async function generateUnifiedService(
 
   const serviceContent = `${headerFor(noCheck)}
 ${v.imports}
-import { Prisma, PrismaClient } from "${clientImportPath}"${runtimeImport}
+import { Prisma, PrismaClient } from "${clientImportPath}"
+import type { Operation } from "@prisma/client/runtime/client"${runtimeImport}
 
 export class PrismaClientService extends ${v.tag("PrismaClientService", "PrismaClient")} {}
 
@@ -778,14 +779,6 @@ const mapUpdateManyError = (error: unknown, operation: string, model: string): P
   throw error;
 }
 
-// The operations the service wraps; the untyped-return view below checks each
-// call's argument against this operation's input type.
-type ServiceOperation =
-  | "findUnique" | "findUniqueOrThrow" | "findFirst" | "findFirstOrThrow"
-  | "findMany" | "create" | "createMany" | "createManyAndReturn" | "delete"
-  | "update" | "deleteMany" | "updateMany" | "updateManyAndReturn" | "upsert"
-  | "count" | "aggregate" | "groupBy"
-
 // The view of the client that operations call delegates through: model and
 // method names stay checked, and each call's argument is checked against the
 // operation's real input type — only the returns are untyped, because a
@@ -796,7 +789,7 @@ type LooseDelegates = {
   [K in keyof Prisma.TransactionClient]: Prisma.TransactionClient[K] extends (...args: never) => unknown
     ? Prisma.TransactionClient[K]
     : {
-        [M in keyof Prisma.TransactionClient[K]]: M extends ServiceOperation
+        [M in keyof Prisma.TransactionClient[K]]: M extends Operation
           ? (args: Prisma.Args<Prisma.TransactionClient[K], M>) => Promise<any>
           : (args?: unknown) => Promise<any>
       }

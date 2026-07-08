@@ -19,25 +19,25 @@ declare const svc: Svc;
 // Never executed — the assertions are checked by tsc, not at runtime.
 const _typeAssertions = () => {
   // findMany with nested select: exact element shape
-  const fmSelect = svc.user.findMany({
+  const usersWithPostTitles = svc.user.findMany({
     select: { id: true, posts: { select: { title: true } } },
   });
-  expectTypeOf<Ok<typeof fmSelect>>().toEqualTypeOf<
+  expectTypeOf<Ok<typeof usersWithPostTitles>>().toEqualTypeOf<
     Array<{ id: number; posts: Array<{ title: string }> }>
   >();
 
   // findMany without args-affecting select: full scalars, no relations
-  const fmPlain = svc.user.findMany({ where: { email: "x" } });
-  expectTypeOf<Ok<typeof fmPlain>>().toEqualTypeOf<
+  const plainUsers = svc.user.findMany({ where: { email: "x" } });
+  expectTypeOf<Ok<typeof plainUsers>>().toEqualTypeOf<
     Array<{ id: number; email: string; name: string | null }>
   >();
 
   // findUnique with include: nullable result carrying the relation
-  const fu = svc.user.findUnique({
+  const userWithPosts = svc.user.findUnique({
     where: { id: 1 },
     include: { posts: true },
   });
-  expectTypeOf<Ok<typeof fu>>().branded.toEqualTypeOf<{
+  expectTypeOf<Ok<typeof userWithPosts>>().branded.toEqualTypeOf<{
     id: number;
     email: string;
     name: string | null;
@@ -50,17 +50,17 @@ const _typeAssertions = () => {
   } | null>();
 
   // findFirst with _count select
-  const ff = svc.user.findFirst({
+  const firstUserWithCount = svc.user.findFirst({
     select: { name: true, _count: { select: { posts: true } } },
   });
-  expectTypeOf<Ok<typeof ff>>().toEqualTypeOf<{
+  expectTypeOf<Ok<typeof firstUserWithCount>>().toEqualTypeOf<{
     name: string | null;
     _count: { posts: number };
   } | null>();
 
   // findUniqueOrThrow: non-nullable
-  const fut = svc.user.findUniqueOrThrow({ where: { id: 1 } });
-  expectTypeOf<Ok<typeof fut>>().toEqualTypeOf<{
+  const requiredUser = svc.user.findUniqueOrThrow({ where: { id: 1 } });
+  expectTypeOf<Ok<typeof requiredUser>>().toEqualTypeOf<{
     id: number;
     email: string;
     name: string | null;
@@ -126,12 +126,12 @@ const _typeAssertions = () => {
   }>();
 
   // aggregate: only requested aggregations appear
-  const agg = svc.user.aggregate({
+  const aggregated = svc.user.aggregate({
     _count: true,
     _min: { id: true },
     _max: { email: true },
   });
-  expectTypeOf<Ok<typeof agg>>().toEqualTypeOf<{
+  expectTypeOf<Ok<typeof aggregated>>().toEqualTypeOf<{
     _count: number;
     _min: { id: number | null };
     _max: { email: string | null };
@@ -139,11 +139,11 @@ const _typeAssertions = () => {
 
   // aggregate on the snake_case model, where Prisma capitalizes the first
   // letter of the generated type names
-  const aggSnake = svc.user_account.aggregate({
+  const aggregatedSnake = svc.user_account.aggregate({
     _avg: { score: true },
     _sum: { score: true },
   });
-  expectTypeOf<Ok<typeof aggSnake>>().toEqualTypeOf<{
+  expectTypeOf<Ok<typeof aggregatedSnake>>().toEqualTypeOf<{
     _avg: { score: number | null };
     _sum: { score: number | null };
   }>();
@@ -173,8 +173,8 @@ const _typeAssertions = () => {
 
   // Unsupported-field model: reads exist (vector is excluded from results),
   // create-family operations don't.
-  const emb = svc.embedding.findMany({});
-  expectTypeOf<Ok<typeof emb>>().toEqualTypeOf<Array<{ id: number }>>();
+  const embeddings = svc.embedding.findMany({});
+  expectTypeOf<Ok<typeof embeddings>>().toEqualTypeOf<Array<{ id: number }>>();
   type EmbeddingOps = keyof Svc["embedding"];
   expectTypeOf<
     "create" extends EmbeddingOps ? true : false
@@ -190,7 +190,7 @@ const _typeAssertions = () => {
   >().toEqualTypeOf<true>();
 
   // Strictness: unknown/excess properties are rejected, in fresh literals
-  // and — via Prisma.Exact — in widened non-literal args too.
+  // and — via Prisma.SelectSubset — in widened non-literal args too.
   // @ts-expect-error - unknown field in where
   svc.user.findMany({ where: { bogus: 1 } });
   // @ts-expect-error - excess top-level property
@@ -200,13 +200,13 @@ const _typeAssertions = () => {
   svc.user.findMany(widenedArgs);
 
   // distinct + orderBy + take don't perturb the result type
-  const distinct = svc.post.findMany({
+  const distinctPosts = svc.post.findMany({
     distinct: ["authorId"],
     orderBy: { id: "asc" },
     take: 5,
     select: { authorId: true },
   });
-  expectTypeOf<Ok<typeof distinct>>().toEqualTypeOf<
+  expectTypeOf<Ok<typeof distinctPosts>>().toEqualTypeOf<
     Array<{ authorId: number }>
   >();
 };
