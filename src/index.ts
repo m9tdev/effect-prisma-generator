@@ -533,11 +533,16 @@ export class PrismaClientService extends ${v.tag("PrismaClientService", "PrismaC
 // A client created with client.$extends(...) (e.g. @prisma/extension-accelerate).
 // Its static type is not structurally compatible with PrismaClient — extended
 // delegates use different generic signatures — but at runtime it supports every
-// operation this service uses. Only a minimal shape is required here.
-export interface ExtendedPrismaClientLike {
+// operation this service uses. Requiring every model delegate property (via
+// TypeMap) makes a client generated from a different schema, or an incomplete
+// mock, a compile error, while still accepting any extension of this schema's
+// client.
+export type ExtendedPrismaClientLike = {
   $transaction(...args: ReadonlyArray<any>): Promise<any>
   $queryRaw(...args: ReadonlyArray<any>): Promise<any>
   $executeRaw(...args: ReadonlyArray<any>): Promise<any>
+} & {
+  [K in Prisma.TypeMap["meta"]["modelProps"]]: unknown
 }
 
 // Builds the PrismaClientService layer from a plain or extended client (#17).

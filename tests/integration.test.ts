@@ -433,4 +433,16 @@ describe("Prisma Effect Generator", () => {
       ),
     ),
   );
+
+  it("should reject clients missing this schema's model delegates at compile time", () => {
+    const wrongShapeClient = {
+      $transaction: async () => undefined,
+      $queryRaw: async () => undefined,
+      $executeRaw: async () => undefined,
+    };
+    // @ts-expect-error — lacks the model delegate properties (user, post, ...),
+    // so it satisfies neither PrismaClientLike nor ExtendedPrismaClientLike.
+    const layer = layerFromPrismaClient(wrongShapeClient);
+    expect(layer).toBeDefined();
+  });
 });

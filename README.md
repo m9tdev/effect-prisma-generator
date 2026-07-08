@@ -129,8 +129,21 @@ const PrismaLayer = Layer.provide(
 ```
 
 At runtime all operations go through the extended client and behave per the
-extension. Note that an extension's type-level changes (such as result
-extensions adding computed fields) are not reflected in the service's types.
+extension. Note that an extension's type-level changes are **not** reflected
+in the service's types:
+
+- Result extensions' computed fields don't appear on the service's return
+  types.
+- Extension-specific query arguments are rejected by the service's typed
+  methods — for Accelerate that means per-query caching config such as
+  `cacheStrategy` cannot be passed through the service without a cast; use
+  the extended client directly (keep your own reference to it) for those
+  queries.
+
+Also note that `PrismaClientService` is typed as `PrismaClientLike`, the
+structural subset of the client the service actually uses. Lifecycle methods
+such as `$disconnect()` are not part of that surface — call them on the
+client you constructed rather than on the service.
 
 ### 2. Use the Service
 
