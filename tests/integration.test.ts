@@ -26,6 +26,15 @@ describe("Prisma Effect Generator", () => {
     Layer.succeed(PrismaClientService, prisma),
   );
 
+  it("marks generated implementation as ts-nocheck", () => {
+    const generatedSource = fs.readFileSync(
+      "prisma/generated/effect.ts",
+      "utf8",
+    );
+
+    expect(generatedSource).toContain("// @ts-nocheck");
+  });
+
   it.effect("should create and find a user", () =>
     Effect.gen(function* () {
       const prisma = yield* PrismaService;
