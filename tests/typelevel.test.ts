@@ -179,6 +179,16 @@ const _typeAssertions = () => {
   expectTypeOf<"upsert" extends EmbeddingOps ? true : false>().toEqualTypeOf<false>();
   expectTypeOf<"findMany" extends EmbeddingOps ? true : false>().toEqualTypeOf<true>();
 
+  // Strictness: unknown/excess properties are rejected, in fresh literals
+  // and — via Prisma.Exact — in widened non-literal args too.
+  // @ts-expect-error - unknown field in where
+  svc.user.findMany({ where: { bogus: 1 } });
+  // @ts-expect-error - excess top-level property
+  svc.user.findMany({ where: { email: "x" }, bogus: true });
+  const widenedArgs = { where: { email: "x" }, bogus: true };
+  // @ts-expect-error - excess property survives widening
+  svc.user.findMany(widenedArgs);
+
   // distinct + orderBy + take don't perturb the result type
   const distinct = svc.post.findMany({
     distinct: ["authorId"],

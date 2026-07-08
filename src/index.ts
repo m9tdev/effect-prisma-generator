@@ -227,152 +227,45 @@ function generateModelOperations(
       const hasOp = (...keys: string[]) =>
         keys.some((key) => Boolean(mapping[key]));
 
+      // Operations are typed with Prisma.Args / Prisma.Result over the
+      // concrete client — the extension-author utilities that resolve for any
+      // delegate. SelectSubset keeps excess-property strictness even for
+      // widened non-literal args (Prisma.Exact does not — pinned in
+      // tests/typelevel.test.ts). The delegate call needs the cast because
+      // with a free generic A the delegate's own generics don't bind to A —
+      // the declared Result<> return is what consumers infer from;
+      // tests/typelevel.test.ts pins those shapes and the integration tests
+      // cover runtime behavior.
+      const emitOp = (opName: string, errorMapper: string) => `
+      ${opName}: <A extends Prisma.Args<PrismaClient["${modelNameCamel}"], "${opName}">>(args: Prisma.SelectSubset<A, Prisma.Args<PrismaClient["${modelNameCamel}"], "${opName}">>) =>
+        Effect.flatMap(clientOrTx(client), client =>
+          Effect.tryPromise({
+            try: (): Promise<Prisma.Result<PrismaClient["${modelNameCamel}"], A, "${opName}">> => (client.${modelNameCamel} as any).${opName}(args),
+            catch: (error) => ${errorMapper}(error, "${opName}", "${modelName}")
+          }),
+        ),
+`;
+
       const createOp = hasOp("createOne", "create")
-        ? `
-      create: <T extends Prisma.${modelName}CreateArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}CreateArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.create(args),
-            catch: (error) => mapCreateError(error, "create", "${modelName}")
-          }),
-        ),
-`
+        ? emitOp("create", "mapCreateError")
         : "";
-
       const createManyOp = hasOp("createMany")
-        ? `
-      createMany: <T extends Prisma.${modelName}CreateManyArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}CreateManyArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.createMany(args),
-            catch: (error) => mapCreateError(error, "createMany", "${modelName}")
-          }),
-        ),
-`
+        ? emitOp("createMany", "mapCreateError")
         : "";
-
       const createManyAndReturnOp = hasOp("createManyAndReturn")
-        ? `
-      createManyAndReturn: <T extends Prisma.${modelName}CreateManyAndReturnArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}CreateManyAndReturnArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.createManyAndReturn(args),
-            catch: (error) => mapCreateError(error, "createManyAndReturn", "${modelName}")
-          }),
-        ),
-`
+        ? emitOp("createManyAndReturn", "mapCreateError")
         : "";
-
       const upsertOp = hasOp("upsertOne", "upsert")
-        ? `
-      upsert: <T extends Prisma.${modelName}UpsertArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}UpsertArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.upsert(args),
-            catch: (error) => mapCreateError(error, "upsert", "${modelName}")
-          }),
-        ),
-`
+        ? emitOp("upsert", "mapCreateError")
         : "";
 
       return `    ${modelNameCamel}: {
-      findUnique: <T extends Prisma.${modelName}FindUniqueArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}FindUniqueArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.findUnique(args),
-            catch: (error) => mapFindError(error, "findUnique", "${modelName}")
-          }),
-        ),
-
-      findUniqueOrThrow: <T extends Prisma.${modelName}FindUniqueOrThrowArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}FindUniqueOrThrowArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.findUniqueOrThrow(args),
-            catch: (error) => mapFindOrThrowError(error, "findUniqueOrThrow", "${modelName}")
-          }),
-        ),
-
-      findFirst: <T extends Prisma.${modelName}FindFirstArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}FindFirstArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.findFirst(args),
-            catch: (error) => mapFindError(error, "findFirst", "${modelName}")
-          }),
-        ),
-
-      findFirstOrThrow: <T extends Prisma.${modelName}FindFirstOrThrowArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}FindFirstOrThrowArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.findFirstOrThrow(args),
-            catch: (error) => mapFindOrThrowError(error, "findFirstOrThrow", "${modelName}")
-          }),
-        ),
-
-      findMany: <T extends Prisma.${modelName}FindManyArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}FindManyArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.findMany(args),
-            catch: (error) => mapFindError(error, "findMany", "${modelName}")
-          }),
-        ),
-${createOp}${createManyOp}${createManyAndReturnOp}
-      delete: <T extends Prisma.${modelName}DeleteArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}DeleteArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.delete(args),
-            catch: (error) => mapDeleteError(error, "delete", "${modelName}")
-          }),
-        ),
-
-      update: <T extends Prisma.${modelName}UpdateArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}UpdateArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.update(args),
-            catch: (error) => mapUpdateError(error, "update", "${modelName}")
-          }),
-        ),
-
-      deleteMany: <T extends Prisma.${modelName}DeleteManyArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}DeleteManyArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.deleteMany(args),
-            catch: (error) => mapDeleteManyError(error, "deleteMany", "${modelName}")
-          }),
-        ),
-
-      updateMany: <T extends Prisma.${modelName}UpdateManyArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}UpdateManyArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.updateMany(args),
-            catch: (error) => mapUpdateManyError(error, "updateMany", "${modelName}")
-          }),
-        ),
-
-      updateManyAndReturn: <T extends Prisma.${modelName}UpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}UpdateManyAndReturnArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.updateManyAndReturn(args),
-            catch: (error) => mapUpdateManyError(error, "updateManyAndReturn", "${modelName}")
-          }),
-        ),
-${upsertOp}
+${emitOp("findUnique", "mapFindError")}${emitOp("findUniqueOrThrow", "mapFindOrThrowError")}${emitOp("findFirst", "mapFindError")}${emitOp("findFirstOrThrow", "mapFindOrThrowError")}${emitOp("findMany", "mapFindError")}${createOp}${createManyOp}${createManyAndReturnOp}${emitOp("delete", "mapDeleteError")}${emitOp("update", "mapUpdateError")}${emitOp("deleteMany", "mapDeleteManyError")}${emitOp("updateMany", "mapUpdateManyError")}${emitOp("updateManyAndReturn", "mapUpdateManyError")}${upsertOp}
       // Aggregation operations
-      count: <T extends Prisma.${modelName}CountArgs>(args: Prisma.SelectSubset<T, Prisma.${modelName}CountArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.count(args),
-            catch: (error) => mapFindError(error, "count", "${modelName}")
-          }),
-        ),
-
-      aggregate: <T extends Prisma.${modelNameCapitalized}AggregateArgs>(args: Prisma.SelectSubset<T, Prisma.${modelNameCapitalized}AggregateArgs>) =>
-        Effect.flatMap(clientOrTx(client), client =>
-          Effect.tryPromise({
-            try: () => client.${modelNameCamel}.aggregate(args),
-            catch: (error) => mapFindError(error, "aggregate", "${modelName}")
-          }),
-        ),
-
+${emitOp("count", "mapFindError")}${emitOp("aggregate", "mapFindError")}
+      // groupBy keeps the frozen-style signature: Prisma.Args<_, "groupBy">
+      // cannot express the delegate's input validation (having/orderBy fields
+      // must appear in "by"), which lives in the delegate's own generics.
       groupBy: <
         T extends Prisma.${modelName}GroupByArgs,
         HasSelectOrTake extends Prisma.Or<
