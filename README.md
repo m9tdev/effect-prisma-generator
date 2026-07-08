@@ -109,6 +109,29 @@ const PrismaLayer = Layer.provide(
 );
 ```
 
+#### Extended clients (`$extends`)
+
+A client created with `client.$extends(...)` — for example with
+`@prisma/extension-accelerate` — has a static type that is not assignable to
+`PrismaClient`, so `Layer.succeed(PrismaClientService, extended)` does not
+typecheck. Use the generated `layerFromPrismaClient` instead, which accepts
+plain and extended clients:
+
+```typescript
+import { PrismaService, layerFromPrismaClient } from "~prisma/effect";
+import { withAccelerate } from "@prisma/extension-accelerate";
+
+const prisma = new PrismaClient().$extends(withAccelerate());
+const PrismaLayer = Layer.provide(
+  PrismaService.Default, // on Effect v4, use PrismaService.layer
+  layerFromPrismaClient(prisma),
+);
+```
+
+At runtime all operations go through the extended client and behave per the
+extension. Note that an extension's type-level changes (such as result
+extensions adding computed fields) are not reflected in the service's types.
+
 ### 2. Use the Service
 
 Access the `PrismaService` in your Effect programs.

@@ -462,7 +462,7 @@ function variantsFor(major: EffectMajor) {
   if (major === 3) {
     return {
       imports:
-        `import { Cause, Context, Data, Effect, Exit, Option, Runtime } from "effect"\n` +
+        `import { Cause, Context, Data, Effect, Exit, Layer, Option, Runtime } from "effect"\n` +
         `import { Service } from "effect/Effect"`,
       tag: (self: string, type: string, id: string = self) =>
         `Context.Tag("${id}")<\n  ${self},\n  ${type}\n>()`,
@@ -508,9 +508,45 @@ async function generateUnifiedService(
 
   const serviceContent = `${headerFor(noCheck)}
 ${v.imports}
-import { Prisma, PrismaClient } from "${clientImportPath}"${runtimeImport}
+import { Prisma } from "${clientImportPath}"${runtimeImport}
 
-export class PrismaClientService extends ${v.tag("PrismaClientService", "PrismaClient")} {}
+// The structural subset of PrismaClient that the generated service uses.
+// Requiring only this (rather than PrismaClient itself) allows extended
+// clients created with client.$extends(...) — e.g. @prisma/extension-accelerate
+// — to be provided as well: their type drops $on/$use, which this service
+// never calls. $transaction is redeclared with only the interactive form the
+// service invokes, because the batch overload's signature differs between the
+// base and extended client types and would fail structural matching.
+export type PrismaClientLike = Omit<Prisma.TransactionClient, "$transaction"> & {
+  $transaction<R>(
+    fn: (tx: Prisma.TransactionClient) => Promise<R>,
+    options?: {
+      maxWait?: number
+      timeout?: number
+      isolationLevel?: Prisma.TransactionIsolationLevel
+    },
+  ): Promise<R>
+}
+
+export class PrismaClientService extends ${v.tag("PrismaClientService", "PrismaClientLike")} {}
+
+// A client created with client.$extends(...) (e.g. @prisma/extension-accelerate).
+// Its static type is not structurally compatible with PrismaClient — extended
+// delegates use different generic signatures — but at runtime it supports every
+// operation this service uses. Only a minimal shape is required here.
+export interface ExtendedPrismaClientLike {
+  $transaction(...args: ReadonlyArray<any>): Promise<any>
+  $queryRaw(...args: ReadonlyArray<any>): Promise<any>
+  $executeRaw(...args: ReadonlyArray<any>): Promise<any>
+}
+
+// Builds the PrismaClientService layer from a plain or extended client (#17).
+// Note: an extension's type-level changes (e.g. result extensions adding
+// computed fields) are not reflected in the service's types; at runtime all
+// operations go through the extended client and behave per the extension.
+export const layerFromPrismaClient = (
+  client: PrismaClientLike | ExtendedPrismaClientLike,
+) => Layer.succeed(PrismaClientService, client as PrismaClientLike)
 
 export class PrismaTransactionClientService extends ${v.tag("PrismaTransactionClientService", "Prisma.TransactionClient")} {}
 
@@ -857,7 +893,7 @@ const mapUpdateManyError = (error: unknown, operation: string, model: string): P
   throw error;
 }
 
-const clientOrTx = (client: PrismaClient) => Effect.map(
+const clientOrTx = (client: PrismaClientLike) => Effect.map(
   Effect.serviceOption(PrismaTransactionClientService),
   Option.getOrElse(() => client),
 );
