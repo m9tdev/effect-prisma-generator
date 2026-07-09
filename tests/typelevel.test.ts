@@ -194,6 +194,14 @@ const _typeAssertions = () => {
     Array<{ email: string; _count: number }>
   >();
 
+  // groupBy input validation: orderBy fields must appear in "by", and take
+  // requires orderBy. These pin the rules the shared GroupBy* helpers encode,
+  // so the per-model signature can't silently stop enforcing them.
+  // @ts-expect-error - "id" ordered but not in "by"
+  service.post.groupBy({ by: ["authorId"], orderBy: { id: "asc" } });
+  // @ts-expect-error - "take" without "orderBy"
+  service.post.groupBy({ by: ["authorId"], take: 5 });
+
   // Unsupported-field model: reads exist (vector is excluded from results),
   // create-family operations don't.
   const embeddings = service.embedding.findMany({});

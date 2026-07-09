@@ -282,67 +282,16 @@ function generateModelOperations(
 
       return `    ${modelNameCamel}: {
 ${operations}
-      // groupBy restates the delegate's validation generics: Prisma.Args<_,
-      // "groupBy"> cannot express its input validation (having/orderBy fields
-      // must appear in "by"), which lives in the delegate's own generics.
-      groupBy: <
-        T extends Prisma.${modelName}GroupByArgs,
-        HasSelectOrTake extends Prisma.Or<
-          Prisma.Extends<'skip', Prisma.Keys<T>>,
-          Prisma.Extends<'take', Prisma.Keys<T>>
-        >,
-        OrderByArg extends Prisma.True extends HasSelectOrTake
-          ? { orderBy: Prisma.${modelName}GroupByArgs['orderBy'] }
-          : { orderBy?: Prisma.${modelName}GroupByArgs['orderBy'] },
-        OrderFields extends Prisma.ExcludeUnderscoreKeys<Prisma.Keys<Prisma.MaybeTupleToUnion<T['orderBy']>>>,
-        ByFields extends Prisma.MaybeTupleToUnion<T['by']>,
-        ByValid extends Prisma.Has<ByFields, OrderFields>,
-        HavingFields extends Prisma.GetHavingFields<T['having']>,
-        HavingValid extends Prisma.Has<ByFields, HavingFields>,
-        ByEmpty extends T['by'] extends never[] ? Prisma.True : Prisma.False,
-        InputErrors extends ByEmpty extends Prisma.True
-        ? \`Error: "by" must not be empty.\`
-        : HavingValid extends Prisma.False
-        ? {
-            [P in HavingFields]: P extends ByFields
-              ? never
-              : P extends string
-              ? \`Error: Field "\${P}" used in "having" needs to be provided in "by".\`
-              : [
-                  Error,
-                  'Field ',
-                  P,
-                  \` in "having" needs to be provided in "by"\`,
-                ]
-          }[HavingFields]
-        : 'take' extends Prisma.Keys<T>
-        ? 'orderBy' extends Prisma.Keys<T>
-          ? ByValid extends Prisma.True
-            ? {}
-            : {
-                [P in OrderFields]: P extends ByFields
-                  ? never
-                  : \`Error: Field "\${P}" in "orderBy" needs to be provided in "by"\`
-              }[OrderFields]
-          : 'Error: If you provide "take", you also need to provide "orderBy"'
-        : 'skip' extends Prisma.Keys<T>
-        ? 'orderBy' extends Prisma.Keys<T>
-          ? ByValid extends Prisma.True
-            ? {}
-            : {
-                [P in OrderFields]: P extends ByFields
-                  ? never
-                  : \`Error: Field "\${P}" in "orderBy" needs to be provided in "by"\`
-              }[OrderFields]
-          : 'Error: If you provide "skip", you also need to provide "orderBy"'
-        : ByValid extends Prisma.True
-        ? {}
-        : {
-            [P in OrderFields]: P extends ByFields
-              ? never
-              : \`Error: Field "\${P}" in "orderBy" needs to be provided in "by"\`
-          }[OrderFields]
-      >(args: Prisma.SubsetIntersection<T, Prisma.${modelName}GroupByArgs, OrderByArg> & InputErrors) =>
+      // groupBy's input validation (having/orderBy fields must appear in "by")
+      // is expressed by the shared GroupBy* helpers, since Prisma.Args cannot
+      // capture it. Only the result type comes from Prisma.Result.
+      groupBy: <T extends Prisma.${modelName}GroupByArgs>(
+        args: Prisma.SubsetIntersection<
+          T,
+          Prisma.${modelName}GroupByArgs,
+          GroupByOrderByArgument<Prisma.${modelName}GroupByArgs, T>
+        > & GroupByInputErrors<T>,
+      ) =>
         Effect.flatMap(clientOrTx(client), client =>
           Effect.tryPromise({
             try: (): Promise<Prisma.Result<PrismaClient["${modelNameCamel}"], T, "groupBy">> => client.${modelNameCamel}.groupBy(args),
@@ -811,6 +760,54 @@ const clientOrTx = (client: PrismaClient) => Effect.map(
   Effect.serviceOption(PrismaTransactionClientService),
   (tx) => Option.getOrElse(tx, () => client) as unknown as LooseDelegates,
 );
+
+// groupBy's input validation (having/orderBy fields must appear in "by")
+// cannot be expressed via Prisma.Args, so it is restated here — once, shared
+// across all models — instead of inline per model. Each helper is derivable
+// from the call's args T (and the model's GroupByArgs for the orderBy
+// requiredness), matching the validation Prisma's own delegate performs.
+type GroupByHasSkipOrTake<T> = Prisma.Or<
+  Prisma.Extends<"skip", Prisma.Keys<T>>,
+  Prisma.Extends<"take", Prisma.Keys<T>>
+>
+type GroupByByFields<T extends { by?: unknown }> = Prisma.MaybeTupleToUnion<T["by"]>
+type GroupByOrderFields<T extends { orderBy?: unknown }> =
+  Prisma.ExcludeUnderscoreKeys<Prisma.Keys<Prisma.MaybeTupleToUnion<T["orderBy"]>> & string>
+type GroupByOrderByArgument<GroupByArgs extends { orderBy?: unknown }, T> =
+  Prisma.True extends GroupByHasSkipOrTake<T>
+    ? { orderBy: GroupByArgs["orderBy"] }
+    : { orderBy?: GroupByArgs["orderBy"] }
+type GroupByOrderByErrors<T extends { by?: unknown; orderBy?: unknown }> = {
+  [P in GroupByOrderFields<T>]: P extends GroupByByFields<T>
+    ? never
+    : \`Error: Field "\${P}" in "orderBy" needs to be provided in "by"\`
+}[GroupByOrderFields<T>]
+type GroupByInputErrors<T extends { by?: unknown; orderBy?: unknown; having?: unknown }> =
+  (T["by"] extends never[] ? Prisma.True : Prisma.False) extends Prisma.True
+  ? \`Error: "by" must not be empty.\`
+  : Prisma.Has<GroupByByFields<T>, Prisma.GetHavingFields<T["having"]>> extends Prisma.False
+  ? {
+      [P in Prisma.GetHavingFields<T["having"]>]: P extends GroupByByFields<T>
+        ? never
+        : P extends string
+        ? \`Error: Field "\${P}" used in "having" needs to be provided in "by".\`
+        : [Error, "Field ", P, \` in "having" needs to be provided in "by"\`]
+    }[Prisma.GetHavingFields<T["having"]>]
+  : "take" extends Prisma.Keys<T>
+  ? "orderBy" extends Prisma.Keys<T>
+    ? Prisma.Has<GroupByByFields<T>, GroupByOrderFields<T>> extends Prisma.True
+      ? {}
+      : GroupByOrderByErrors<T>
+    : 'Error: If you provide "take", you also need to provide "orderBy"'
+  : "skip" extends Prisma.Keys<T>
+  ? "orderBy" extends Prisma.Keys<T>
+    ? Prisma.Has<GroupByByFields<T>, GroupByOrderFields<T>> extends Prisma.True
+      ? {}
+      : GroupByOrderByErrors<T>
+    : 'Error: If you provide "skip", you also need to provide "orderBy"'
+  : Prisma.Has<GroupByByFields<T>, GroupByOrderFields<T>> extends Prisma.True
+  ? {}
+  : GroupByOrderByErrors<T>
 
 export class PrismaService extends ${v.serviceConstructor}("PrismaService", {
   ${v.serviceConfigKey}: Effect.gen(function* () {
