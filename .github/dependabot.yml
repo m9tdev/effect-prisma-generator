@@ -15,6 +15,14 @@ updates:
     cooldown:
       default-days: 7
       semver-major-days: 14
+    ignore:
+      # Tracks the Node version CI runs on (see ci.yml), not the newest Node.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # The effect-v3 matrix leg uses @effect/vitest 0.27, which requires
+      # vitest ^3.2; a vitest major would break that leg.
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
