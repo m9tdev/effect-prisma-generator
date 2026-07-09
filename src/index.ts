@@ -220,20 +220,21 @@ function generateModelOperations(
       const hasOp = (...keys: string[]) =>
         keys.some((key) => Boolean(mapping[key]));
 
-      // Operations are typed with Prisma.Args / Prisma.Result over the
-      // concrete client — the extension-author utilities that resolve for any
-      // delegate. SelectSubset keeps excess-property strictness even for
+      // Operations are typed with Prisma.Args / Prisma.Result over the caller's
+      // own client type TClient — the extension-author utilities that resolve
+      // for any delegate, so an extended client's result extensions and args
+      // flow through. SelectSubset keeps excess-property strictness even for
       // widened non-literal args (Prisma.Exact does not — pinned in
-      // tests/typelevel.test.ts). The delegate call needs the cast because
-      // with a free generic A the delegate's own generics don't bind to A —
-      // the declared Result<> return is what consumers infer from;
-      // tests/typelevel.test.ts pins those shapes and the integration tests
-      // cover runtime behavior.
+      // tests/typelevel.test.ts). The delegate call routes through the loose
+      // view (method names stay checked) and casts the arg, because with a free
+      // TClient the delegate's own generics don't bind to A — the declared
+      // Result<> return is what consumers infer from; tests/typelevel.test.ts
+      // pins those shapes and the integration tests cover runtime behavior.
       const emitOperation = (operationName: string, errorMapper: string) => `
-      ${operationName}: <A extends Prisma.Args<PrismaClient["${modelNameCamel}"], "${operationName}">>(args: Prisma.SelectSubset<A, Prisma.Args<PrismaClient["${modelNameCamel}"], "${operationName}">>) =>
+      ${operationName}: <A extends Prisma.Args<TClient["${modelNameCamel}"], "${operationName}">>(args: Prisma.SelectSubset<A, Prisma.Args<TClient["${modelNameCamel}"], "${operationName}">>) =>
         Effect.flatMap(clientOrTx(client), client =>
           Effect.tryPromise({
-            try: (): Promise<Prisma.Result<PrismaClient["${modelNameCamel}"], A, "${operationName}">> => client.${modelNameCamel}.${operationName}(args),
+            try: (): Promise<Prisma.Result<TClient["${modelNameCamel}"], A, "${operationName}">> => client.${modelNameCamel}.${operationName}(args as never),
             catch: (error) => ${errorMapper}(error, "${operationName}", "${modelName}")
           }),
         ),
@@ -294,7 +295,7 @@ ${operations}
       ) =>
         Effect.flatMap(clientOrTx(client), client =>
           Effect.tryPromise({
-            try: (): Promise<Prisma.Result<PrismaClient["${modelNameCamel}"], T, "groupBy">> => client.${modelNameCamel}.groupBy(args),
+            try: (): Promise<Prisma.Result<TClient["${modelNameCamel}"], T, "groupBy">> => client.${modelNameCamel}.groupBy(args as never),
             catch: (error) => mapFindError(error, "groupBy", "${modelName}")
           }),
         ),
@@ -756,7 +757,7 @@ type LooseDelegates = {
       }
 }
 
-const clientOrTx = (client: PrismaClient) => Effect.map(
+const clientOrTx = (client: ExtendedPrismaClientLike) => Effect.map(
   Effect.serviceOption(PrismaTransactionClientService),
   (tx) => Option.getOrElse(tx, () => client) as unknown as LooseDelegates,
 );
@@ -809,42 +810,51 @@ type GroupByInputErrors<T extends { by?: unknown; orderBy?: unknown; having?: un
   ? {}
   : GroupByOrderByErrors<T>
 
+// Builds the service operations over any client of this schema. Generic over
+// the client type, so providing an extended client (client.$extends(...))
+// yields methods whose args and results reflect the extension. The default
+// PrismaService below instantiates it at PrismaClient; extended-client users
+// instantiate it at their own \`typeof client\` (see the README).
+export const makePrismaService = <TClient extends ExtendedPrismaClientLike>(
+  client: TClient,
+) => ({
+  $transaction: <A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+    options?: {
+      maxWait?: number
+      timeout?: number
+      isolationLevel?: Prisma.TransactionIsolationLevel
+    }
+  ) =>
+    Effect.gen(function* () {
+      const ${v.txContextVar} = yield* ${v.txContextExpr};
+      const tx = yield* Effect.serviceOption(PrismaTransactionClientService);
+      return yield* Option.match(tx, {
+        onSome: (tx) => effect,
+        onNone: () =>  Effect.tryPromise({
+          try: () =>
+            client.$transaction(async (tx: Prisma.TransactionClient) => {
+              const exit = await ${v.txRun}(
+                effect.pipe(Effect.provideService(PrismaTransactionClientService, tx)) as Effect.Effect<A, E, R>,
+              )
+              if (Exit.isSuccess(exit)) {
+                return exit.value
+              }
+              throw Cause.squash(exit.cause)
+            }, options),
+          catch: (error) => error as E,
+        }) as unknown as Effect.Effect<A, E, R>,
+      })
+    }),
+  ${rawSqlOperations}
+
+  ${modelOperations}
+})
+
 export class PrismaService extends ${v.serviceConstructor}("PrismaService", {
   ${v.serviceConfigKey}: Effect.gen(function* () {
     const client = yield* PrismaClientService;
-    return {
-      $transaction: <A, E, R>(
-        effect: Effect.Effect<A, E, R>,
-        options?: {
-          maxWait?: number
-          timeout?: number
-          isolationLevel?: Prisma.TransactionIsolationLevel
-        }
-      ) =>
-        Effect.gen(function* () {
-          const ${v.txContextVar} = yield* ${v.txContextExpr};
-          const tx = yield* Effect.serviceOption(PrismaTransactionClientService);
-          return yield* Option.match(tx, {
-            onSome: (tx) => effect,
-            onNone: () =>  Effect.tryPromise({
-              try: () =>
-                client.$transaction(async (tx) => {
-                  const exit = await ${v.txRun}(
-                    effect.pipe(Effect.provideService(PrismaTransactionClientService, tx)) as Effect.Effect<A, E, R>,
-                  )
-                  if (Exit.isSuccess(exit)) {
-                    return exit.value
-                  }
-                  throw Cause.squash(exit.cause)
-                }, options),
-              catch: (error) => error as E,
-            }) as unknown as Effect.Effect<A, E, R>,
-          })
-        }),
-      ${rawSqlOperations}
-
-      ${modelOperations}
-    }
+    return makePrismaService(client);
   })
 }) {${v.serviceStatics}
 }
