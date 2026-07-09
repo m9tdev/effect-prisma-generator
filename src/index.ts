@@ -308,16 +308,17 @@ ${operations}
 // rest of the generated file is identical across majors.
 function variantsFor(major: EffectMajor) {
   if (major === 3) {
+    // The key is an expression so definePrismaService can pass its runtime
+    // `key` parameter; module-level tags pass their name as a string literal.
+    const tagWithRuntimeKey = (self: string, type: string, keyExpr: string) =>
+      `Context.Tag(${keyExpr})<${self}, ${type}>()`;
     return {
       imports:
         `import { Cause, Context, Data, Effect, Exit, Layer, Option, Runtime } from "effect"\n` +
         `import { Service } from "effect/Effect"`,
       tag: (self: string, type: string, id: string = self) =>
-        `Context.Tag("${id}")<\n  ${self},\n  ${type}\n>()`,
-      // A tag whose runtime identity comes from a value (not a literal), for
-      // the user-instantiated definePrismaService factory.
-      tagWithRuntimeKey: (self: string, type: string, keyExpr: string) =>
-        `Context.Tag(${keyExpr})<${self}, ${type}>()`,
+        tagWithRuntimeKey(self, type, `"${id}"`),
+      tagWithRuntimeKey,
       serviceConstructor: `Service<PrismaService>()`,
       serviceConfigKey: "effect",
       txContextVar: "runtime",
@@ -327,12 +328,13 @@ function variantsFor(major: EffectMajor) {
       serviceStatics: "",
     };
   }
+  const tagWithRuntimeKey = (self: string, type: string, keyExpr: string) =>
+    `Context.Service<${self}, ${type}>()(${keyExpr})`;
   return {
     imports: `import { Cause, Context, Data, Effect, Exit, Layer, Option } from "effect"`,
     tag: (self: string, type: string, id: string = self) =>
-      `Context.Service<\n  ${self},\n  ${type}\n>()("${id}")`,
-    tagWithRuntimeKey: (self: string, type: string, keyExpr: string) =>
-      `Context.Service<${self}, ${type}>()(${keyExpr})`,
+      tagWithRuntimeKey(self, type, `"${id}"`),
+    tagWithRuntimeKey,
     serviceConstructor: `Context.Service<PrismaService>()`,
     serviceConfigKey: "make",
     txContextVar: "services",
