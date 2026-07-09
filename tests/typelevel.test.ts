@@ -71,7 +71,9 @@ const _typeAssertions = () => {
     where: { id: 1 },
     select: { email: true },
   });
-  expectTypeOf<Ok<typeof requiredFirstUser>>().toEqualTypeOf<{ email: string }>();
+  expectTypeOf<Ok<typeof requiredFirstUser>>().toEqualTypeOf<{
+    email: string;
+  }>();
 
   // create with nested create and select
   const created = service.user.create({
@@ -107,7 +109,10 @@ const _typeAssertions = () => {
   expectTypeOf<Ok<typeof upserted>>().toEqualTypeOf<{ email: string }>();
 
   // delete / deleteMany / updateMany / createMany
-  const deleted = service.post.delete({ where: { id: 1 }, select: { id: true } });
+  const deleted = service.post.delete({
+    where: { id: 1 },
+    select: { id: true },
+  });
   expectTypeOf<Ok<typeof deleted>>().toEqualTypeOf<{ id: number }>();
   const deletedMany = service.post.deleteMany({ where: { authorId: 1 } });
   expectTypeOf<Ok<typeof deletedMany>>().toEqualTypeOf<{ count: number }>();
@@ -134,7 +139,12 @@ const _typeAssertions = () => {
     data: { title: "t" },
   });
   expectTypeOf<Ok<typeof updatedAndReturned>>().branded.toEqualTypeOf<
-    Array<{ id: number; title: string; content: string | null; authorId: number }>
+    Array<{
+      id: number;
+      title: string;
+      content: string | null;
+      authorId: number;
+    }>
   >();
 
   // count: plain number, and object form with select
