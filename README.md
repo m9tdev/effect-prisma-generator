@@ -136,23 +136,20 @@ extensions' computed fields, extension-specific args like Accelerate's
 the extended client's runtime behavior but don't need its types through the
 service.
 
-##### Full type fidelity (`makePrismaService`)
+##### Full type fidelity (`definePrismaService`)
 
 To get the extended client's **types** through the service — computed result
-fields, extension args — build the service from your client with
-`makePrismaService` and expose it under your own tag typed to that client:
+fields, extension args — use `definePrismaService`, which builds a service tag
+and layer for your specific client type in one step:
 
 ```typescript
-import { Context, Effect, Layer } from "effect";
-import { makePrismaService } from "~prisma/effect";
+import { Effect } from "effect";
+import { definePrismaService } from "~prisma/effect";
 
 const prisma = new PrismaClient().$extends(withAccelerate());
-type PrismaOps = ReturnType<typeof makePrismaService<typeof prisma>>;
 
-// One tag, typed to your specific client (Effect v4 shown; on v3 use
-// Context.Tag / Effect.Service the same way).
-class Prisma extends Context.Service<Prisma, PrismaOps>()("Prisma") {}
-const PrismaLayer = Layer.succeed(Prisma, makePrismaService(prisma));
+const { service: Prisma, layer } = definePrismaService<typeof prisma>();
+const PrismaLayer = layer(prisma);
 
 const program = Effect.gen(function* () {
   const db = yield* Prisma;
@@ -161,9 +158,16 @@ const program = Effect.gen(function* () {
 });
 ```
 
-`makePrismaService` is generic over the client type, so a plain `PrismaClient`
-yields exactly the base types (identical to the default `PrismaService`) and an
-extended client yields its extended types.
+The tag's runtime key defaults to `"PrismaService"` (the same as the built-in
+service) — use one of the two, or pass a distinct key
+(`definePrismaService<typeof prisma>("MyDb")`) if an app needs several
+client-typed services at once.
+
+Under the hood this wraps `makePrismaService(client)` — also exported if you
+want to build the operations object and manage the tag yourself. Both are
+generic over the client type, so a plain `PrismaClient` yields exactly the base
+types (identical to the default `PrismaService`) and an extended client yields
+its extended types, transactions included.
 
 `PrismaClientService` stays typed as `PrismaClient`, so lifecycle methods
 remain available through the service — `$connect()`, `$disconnect()`, and
