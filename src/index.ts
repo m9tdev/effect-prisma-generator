@@ -229,55 +229,59 @@ function generateModelOperations(
       // the declared Result<> return is what consumers infer from;
       // tests/typelevel.test.ts pins those shapes and the integration tests
       // cover runtime behavior.
-      const emitOp = (opName: string, errorMapper: string) => `
-      ${opName}: <A extends Prisma.Args<PrismaClient["${modelNameCamel}"], "${opName}">>(args: Prisma.SelectSubset<A, Prisma.Args<PrismaClient["${modelNameCamel}"], "${opName}">>) =>
+      const emitOperation = (operationName: string, errorMapper: string) => `
+      ${operationName}: <A extends Prisma.Args<PrismaClient["${modelNameCamel}"], "${operationName}">>(args: Prisma.SelectSubset<A, Prisma.Args<PrismaClient["${modelNameCamel}"], "${operationName}">>) =>
         Effect.flatMap(clientOrTx(client), client =>
           Effect.tryPromise({
-            try: (): Promise<Prisma.Result<PrismaClient["${modelNameCamel}"], A, "${opName}">> => client.${modelNameCamel}.${opName}(args),
-            catch: (error) => ${errorMapper}(error, "${opName}", "${modelName}")
+            try: (): Promise<Prisma.Result<PrismaClient["${modelNameCamel}"], A, "${operationName}">> => client.${modelNameCamel}.${operationName}(args),
+            catch: (error) => ${errorMapper}(error, "${operationName}", "${modelName}")
           }),
         ),
 `;
 
-      const createOp = hasOp("createOne", "create")
-        ? emitOp("create", "mapCreateError")
+      // create/createMany/createManyAndReturn/upsert/updateManyAndReturn are
+      // omitted by Prisma for some models or providers (a required
+      // Unsupported() field, or a provider without the operation). Emit each
+      // only when its DMMF mapping exists — otherwise Prisma.Args would resolve
+      // to `any`, silently exposing an untyped method that fails at runtime.
+      const createOperation = hasOp("createOne", "create")
+        ? emitOperation("create", "mapCreateError")
         : "";
-      const createManyOp = hasOp("createMany")
-        ? emitOp("createMany", "mapCreateError")
+      const createManyOperation = hasOp("createMany")
+        ? emitOperation("createMany", "mapCreateError")
         : "";
-      const createManyAndReturnOp = hasOp("createManyAndReturn")
-        ? emitOp("createManyAndReturn", "mapCreateError")
+      const createManyAndReturnOperation = hasOp("createManyAndReturn")
+        ? emitOperation("createManyAndReturn", "mapCreateError")
         : "";
-      const upsertOp = hasOp("upsertOne", "upsert")
-        ? emitOp("upsert", "mapCreateError")
+      const upsertOperation = hasOp("upsertOne", "upsert")
+        ? emitOperation("upsert", "mapCreateError")
+        : "";
+      const updateManyAndReturnOperation = hasOp("updateManyAndReturn")
+        ? emitOperation("updateManyAndReturn", "mapUpdateManyError")
         : "";
 
       const operations = [
-        emitOp("findUnique", "mapFindError"),
-        emitOp("findUniqueOrThrow", "mapFindOrThrowError"),
-        emitOp("findFirst", "mapFindError"),
-        emitOp("findFirstOrThrow", "mapFindOrThrowError"),
-        emitOp("findMany", "mapFindError"),
-        createOp,
-        createManyOp,
-        createManyAndReturnOp,
-        emitOp("delete", "mapDeleteError"),
-        emitOp("update", "mapUpdateError"),
-        emitOp("deleteMany", "mapDeleteManyError"),
-        emitOp("updateMany", "mapUpdateManyError"),
-        emitOp("updateManyAndReturn", "mapUpdateManyError"),
-        upsertOp,
-      ].join("");
-
-      const aggregations = [
-        emitOp("count", "mapFindError"),
-        emitOp("aggregate", "mapFindError"),
+        emitOperation("findUnique", "mapFindError"),
+        emitOperation("findUniqueOrThrow", "mapFindOrThrowError"),
+        emitOperation("findFirst", "mapFindError"),
+        emitOperation("findFirstOrThrow", "mapFindOrThrowError"),
+        emitOperation("findMany", "mapFindError"),
+        createOperation,
+        createManyOperation,
+        createManyAndReturnOperation,
+        emitOperation("delete", "mapDeleteError"),
+        emitOperation("update", "mapUpdateError"),
+        emitOperation("deleteMany", "mapDeleteManyError"),
+        emitOperation("updateMany", "mapUpdateManyError"),
+        updateManyAndReturnOperation,
+        upsertOperation,
+        "\n      // Aggregation operations\n",
+        emitOperation("count", "mapFindError"),
+        emitOperation("aggregate", "mapFindError"),
       ].join("");
 
       return `    ${modelNameCamel}: {
 ${operations}
-      // Aggregation operations
-${aggregations}
       // groupBy restates the delegate's validation generics: Prisma.Args<_,
       // "groupBy"> cannot express its input validation (having/orderBy fields
       // must appear in "by"), which lives in the delegate's own generics.
@@ -402,8 +406,7 @@ async function generateUnifiedService(
 
   const serviceContent = `${headerFor(noCheck)}
 ${v.imports}
-import { Prisma, PrismaClient } from "${clientImportPath}"
-import type { Operation } from "@prisma/client/runtime/client"${runtimeImport}
+import { Prisma, PrismaClient } from "${clientImportPath}"${runtimeImport}
 
 export class PrismaClientService extends ${v.tag("PrismaClientService", "PrismaClient")} {}
 
@@ -779,19 +782,28 @@ const mapUpdateManyError = (error: unknown, operation: string, model: string): P
   throw error;
 }
 
+// The union of every operation any model supports, derived from the client's
+// own TypeMap so it flows through the configured client import rather than a
+// hardcoded @prisma/client runtime specifier.
+type Operation = {
+  [Model in keyof Prisma.TypeMap["model"]]: keyof Prisma.TypeMap["model"][Model]["operations"]
+}[keyof Prisma.TypeMap["model"]]
+
 // The view of the client that operations call delegates through: model and
 // method names stay checked, and each call's argument is checked against the
 // operation's real input type — only the returns are untyped, because a
 // delegate's own generics cannot bind the service's type parameter, so each
-// operation's declared Result<> return carries the types instead. Direct
-// function properties ($queryRaw, $transaction, ...) keep their real types.
+// operation's declared Result<> return carries the types instead. Non-operation
+// members (a delegate's \`fields\`, direct function properties like $queryRaw)
+// keep their real types, so calling a member outside Operation is a compile
+// error rather than a silently unchecked call.
 type LooseDelegates = {
   [K in keyof Prisma.TransactionClient]: Prisma.TransactionClient[K] extends (...args: never) => unknown
     ? Prisma.TransactionClient[K]
     : {
         [M in keyof Prisma.TransactionClient[K]]: M extends Operation
           ? (args: Prisma.Args<Prisma.TransactionClient[K], M>) => Promise<any>
-          : (args?: unknown) => Promise<any>
+          : Prisma.TransactionClient[K][M]
       }
 }
 
