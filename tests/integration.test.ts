@@ -377,10 +377,10 @@ describe("Prisma Effect Generator", () => {
     // Embedding has a required Unsupported("vector") field, so Prisma omits its
     // create/createMany/createManyAndReturn/upsert ops and their *Args types;
     // the service must skip those operations but keep the rest of the model.
-    expect(generated).not.toContain("EmbeddingCreateArgs");
-    expect(generated).not.toContain("EmbeddingCreateManyArgs");
-    expect(generated).not.toContain("EmbeddingCreateManyAndReturnArgs");
-    expect(generated).not.toContain("EmbeddingUpsertArgs");
+    // "client.embedding.create" is a prefix of createMany/createManyAndReturn,
+    // so this one assertion covers the whole create family.
+    expect(generated).not.toContain("client.embedding.create");
+    expect(generated).not.toContain("client.embedding.upsert");
     expect(generated).toContain("client.embedding.findMany");
     expect(generated).toContain("client.embedding.update");
     expect(generated).toContain("client.embedding.aggregate");
@@ -429,7 +429,7 @@ describe("Prisma Effect Generator", () => {
           serviceLayer,
           // Extended clients have type DynamicClientExtensionThis, which is
           // not assignable to PrismaClient; layerFromPrismaClient must accept
-          // one without casts on the consumer side (#17).
+          // one without casts on the consumer side.
           layerFromPrismaClient(
             prisma.$extends({
               name: "test-extension",
