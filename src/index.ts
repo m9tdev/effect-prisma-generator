@@ -314,6 +314,10 @@ function variantsFor(major: EffectMajor) {
         `import { Service } from "effect/Effect"`,
       tag: (self: string, type: string, id: string = self) =>
         `Context.Tag("${id}")<\n  ${self},\n  ${type}\n>()`,
+      // A tag whose runtime identity comes from a value (not a literal), for
+      // the user-instantiated definePrismaService factory.
+      tagWithRuntimeKey: (self: string, type: string, keyExpr: string) =>
+        `Context.Tag(${keyExpr})<${self}, ${type}>()`,
       serviceConstructor: `Service<PrismaService>()`,
       serviceConfigKey: "effect",
       txContextVar: "runtime",
@@ -327,6 +331,8 @@ function variantsFor(major: EffectMajor) {
     imports: `import { Cause, Context, Data, Effect, Exit, Layer, Option } from "effect"`,
     tag: (self: string, type: string, id: string = self) =>
       `Context.Service<\n  ${self},\n  ${type}\n>()("${id}")`,
+    tagWithRuntimeKey: (self: string, type: string, keyExpr: string) =>
+      `Context.Service<${self}, ${type}>()(${keyExpr})`,
     serviceConstructor: `Context.Service<PrismaService>()`,
     serviceConfigKey: "make",
     txContextVar: "services",
@@ -857,6 +863,28 @@ export class PrismaService extends ${v.serviceConstructor}("PrismaService", {
     return makePrismaService(client);
   })
 }) {${v.serviceStatics}
+}
+
+// Defines a service tag + layer builder for a specific client type, so an
+// extended client's types flow through the service in one step:
+//
+//   const { service: Db, layer } = definePrismaService<typeof myClient>()
+//   const DbLayer = layer(myClient)
+//   // ... yield* Db  ->  operations typed against myClient (extensions included)
+//
+// \`key\` is the tag's runtime identity; it defaults to "PrismaService" (the
+// same as the built-in service above). Use one of the two, or pass a distinct
+// key if an app needs several client-typed services at once.
+export const definePrismaService = <TClient extends ExtendedPrismaClientLike>(
+  key: string = "PrismaService",
+) => {
+  type Operations = ReturnType<typeof makePrismaService<TClient>>
+  class PrismaServiceTag extends ${v.tagWithRuntimeKey("PrismaServiceTag", "Operations", "key")} {}
+  return {
+    service: PrismaServiceTag,
+    layer: (client: TClient) =>
+      Layer.succeed(PrismaServiceTag, makePrismaService(client)),
+  }
 }
 `;
 

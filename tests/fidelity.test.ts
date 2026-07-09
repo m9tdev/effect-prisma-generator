@@ -7,7 +7,10 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { Effect } from "effect";
 import { PrismaClient } from "./prisma/generated/client";
-import { makePrismaService } from "./prisma/generated/effect";
+import {
+  definePrismaService,
+  makePrismaService,
+} from "./prisma/generated/effect";
 
 type Ok<E> = E extends Effect.Effect<infer A, any, any> ? A : never;
 
@@ -56,6 +59,18 @@ const _typeAssertions = () => {
     id: number;
     email: string;
     name: string | null;
+  } | null>();
+
+  // definePrismaService: the ergonomic front door carries the same fidelity —
+  // yielding the tag gives operations typed against the client it was defined
+  // for, extension fields included.
+  const { service: Db, layer } = definePrismaService<typeof extended>();
+  const program = Effect.gen(function* () {
+    const db = yield* Db;
+    return yield* db.user.findFirst({ select: { upperEmail: true } });
+  }).pipe(Effect.provide(layer(extended)));
+  expectTypeOf<Ok<typeof program>>().branded.toEqualTypeOf<{
+    upperEmail: string;
   } | null>();
 };
 
