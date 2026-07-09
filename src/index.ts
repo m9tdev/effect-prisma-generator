@@ -210,15 +210,21 @@ function generateModelOperations(
     .map((model) => {
       const modelName = model.name;
       const modelNameCamel = toCamelCase(modelName);
-      // A model with a required `Unsupported(...)` field (e.g. a pgvector
-      // `vector` column) cannot be created through the typed client, so Prisma
-      // omits its create/createMany/createManyAndReturn/upsert operations and
-      // their `*Args` types. Emit each operation only when its DMMF mapping
-      // exists; Prisma 7 names the single-record mappings `createOne`/
-      // `upsertOne`, older majors used `create`/`upsert`.
+      // Prisma omits an operation's DMMF mapping (and its `*Args` types) when
+      // a model or provider can't support it — e.g. no create-family
+      // operations on a model with a required `Unsupported(...)` field. Emit
+      // each operation only when its mapping exists — otherwise Prisma.Args
+      // would resolve to `any`, silently exposing an untyped method that
+      // fails at runtime. Mapping keys are the operation name, except that
+      // single-record operations carry a "One" suffix on current majors
+      // (`createOne`; older majors used the plain name) and `count` has no
+      // mapping of its own — it exists whenever `aggregate` does.
       const mapping = mappingByModel.get(modelName) ?? {};
-      const hasOp = (...keys: string[]) =>
-        keys.some((key) => Boolean(mapping[key]));
+      const hasOperation = (operationName: string) => {
+        const mappingKey =
+          operationName === "count" ? "aggregate" : operationName;
+        return Boolean(mapping[mappingKey] ?? mapping[`${mappingKey}One`]);
+      };
 
       // Operations are typed with Prisma.Args / Prisma.Result over the caller's
       // own client type TClient — the extension-author utilities that resolve
@@ -240,58 +246,31 @@ function generateModelOperations(
         ),
 `;
 
-      // `gatedOn` lists the operation's DMMF mapping keys: Prisma omits some
-      // operations for some models or providers (a required Unsupported()
-      // field, or a provider without the operation), so a gated operation is
-      // emitted only when one of its mapping keys exists — otherwise
-      // Prisma.Args would resolve to `any`, silently exposing an untyped
-      // method that fails at runtime.
       const operationDefinitions: Array<{
         name: string;
         errorMapper: string;
-        gatedOn?: string[];
       }> = [
         { name: "findUnique", errorMapper: "mapFindError" },
         { name: "findUniqueOrThrow", errorMapper: "mapFindOrThrowError" },
         { name: "findFirst", errorMapper: "mapFindError" },
         { name: "findFirstOrThrow", errorMapper: "mapFindOrThrowError" },
         { name: "findMany", errorMapper: "mapFindError" },
-        {
-          name: "create",
-          errorMapper: "mapCreateError",
-          gatedOn: ["createOne", "create"],
-        },
-        {
-          name: "createMany",
-          errorMapper: "mapCreateError",
-          gatedOn: ["createMany"],
-        },
-        {
-          name: "createManyAndReturn",
-          errorMapper: "mapCreateError",
-          gatedOn: ["createManyAndReturn"],
-        },
+        { name: "create", errorMapper: "mapCreateError" },
+        { name: "createMany", errorMapper: "mapCreateError" },
+        { name: "createManyAndReturn", errorMapper: "mapCreateError" },
         { name: "delete", errorMapper: "mapDeleteError" },
         { name: "update", errorMapper: "mapUpdateError" },
         { name: "deleteMany", errorMapper: "mapDeleteManyError" },
         { name: "updateMany", errorMapper: "mapUpdateManyError" },
-        {
-          name: "updateManyAndReturn",
-          errorMapper: "mapUpdateManyError",
-          gatedOn: ["updateManyAndReturn"],
-        },
-        {
-          name: "upsert",
-          errorMapper: "mapCreateError",
-          gatedOn: ["upsertOne", "upsert"],
-        },
+        { name: "updateManyAndReturn", errorMapper: "mapUpdateManyError" },
+        { name: "upsert", errorMapper: "mapCreateError" },
         { name: "count", errorMapper: "mapFindError" },
         { name: "aggregate", errorMapper: "mapFindError" },
       ];
 
       const operations = operationDefinitions
         .map((operation) =>
-          !operation.gatedOn || hasOp(...operation.gatedOn)
+          hasOperation(operation.name)
             ? emitOperation(operation.name, operation.errorMapper)
             : "",
         )
