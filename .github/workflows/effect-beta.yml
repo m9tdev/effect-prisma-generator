@@ -1,0 +1,41 @@
+name: effect-beta canary
+
+# Non-blocking canary: the CI matrix pins an effect v4 beta that silently ages,
+# so run the suite against the latest beta weekly to surface upstream breakage
+# before a user reports it. Failures notify but never block PRs.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install test fixtures (effect@beta)
+        # Same single-vitest-instance setup as the CI test matrix. The repo
+        # .npmrc quarantines fresh releases; this canary exists to test them,
+        # so lift the cooldown for this install only.
+        env:
+          NPM_CONFIG_MIN_RELEASE_AGE: "0"
+        run: cd tests && npm install --no-save --no-package-lock --legacy-peer-deps effect@beta @effect/vitest@beta
+
+      - name: Run tests
+        run: npm test

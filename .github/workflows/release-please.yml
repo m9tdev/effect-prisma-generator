@@ -10,9 +10,16 @@ permissions:
   pull-requests: write
   id-token: write # Required for npm provenance
 
+# Serialize runs so two pushes to main can't race on the release PR or publish
+# twice; never cancel a run that may already be publishing.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         id: release
@@ -28,7 +35,9 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "lts/*"
+          # Same version CI tests on, so the published artifact is built on a
+          # Node the test suite has actually run against.
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
@@ -38,6 +47,12 @@ jobs:
       - name: Build
         if: ${{ steps.release.outputs.release_created }}
         run: npm run build
+
+      # Last line of defense: never publish a build the test suite hasn't
+      # passed on, even if a red main slipped through.
+      - name: Test
+        if: ${{ steps.release.outputs.release_created }}
+        run: npm test
 
       - name: Publish to npm
         if: ${{ steps.release.outputs.release_created }}
