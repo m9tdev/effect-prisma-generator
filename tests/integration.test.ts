@@ -5,6 +5,7 @@ import * as fs from "fs";
 import { PrismaClient } from "./prisma/generated/client";
 import {
   layerFromPrismaClient,
+  makePrismaService,
   PrismaClientService,
   PrismaService,
   PrismaTransactionClientService,
@@ -443,6 +444,48 @@ describe("Prisma Effect Generator", () => {
         ),
       ),
     ),
+  );
+
+  it.effect(
+    "should apply an extended client's result extension through makePrismaService, including inside a transaction",
+    () =>
+      Effect.gen(function* () {
+        const extended = prisma.$extends({
+          result: {
+            user: {
+              upperEmail: {
+                needs: { email: true },
+                compute: (user) => user.email.toUpperCase(),
+              },
+            },
+          },
+        });
+        const db = makePrismaService(extended);
+        const email = `fidelity-${Date.now()}@example.com`;
+
+        yield* db.user.create({ data: { email, name: "Fidelity" } });
+
+        // Outside a transaction: the computed field is applied at runtime and
+        // its type is present (no cast needed to read it).
+        const outside = yield* db.user.findUniqueOrThrow({
+          where: { email },
+          select: { upperEmail: true },
+        });
+        expect(outside.upperEmail).toBe(email.toUpperCase());
+
+        // Inside a transaction the extension still applies — the extended
+        // client propagates its extensions into the transaction callback, so
+        // the TClient-fidelity return type is honest inside transactions too.
+        const inside = yield* db.$transaction(
+          db.user.findUniqueOrThrow({
+            where: { email },
+            select: { upperEmail: true },
+          }),
+        );
+        expect(inside.upperEmail).toBe(email.toUpperCase());
+
+        yield* db.user.delete({ where: { email } });
+      }),
   );
 
   it("should reject clients missing this schema's model delegates at compile time", () => {

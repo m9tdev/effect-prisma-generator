@@ -210,75 +210,71 @@ function generateModelOperations(
     .map((model) => {
       const modelName = model.name;
       const modelNameCamel = toCamelCase(modelName);
-      // A model with a required `Unsupported(...)` field (e.g. a pgvector
-      // `vector` column) cannot be created through the typed client, so Prisma
-      // omits its create/createMany/createManyAndReturn/upsert operations and
-      // their `*Args` types. Emit each operation only when its DMMF mapping
-      // exists; Prisma 7 names the single-record mappings `createOne`/
-      // `upsertOne`, older majors used `create`/`upsert`.
+      // Prisma omits an operation's DMMF mapping (and its `*Args` types) when
+      // a model or provider can't support it — e.g. no create-family
+      // operations on a model with a required `Unsupported(...)` field. Emit
+      // each operation only when its mapping exists — otherwise Prisma.Args
+      // would resolve to `any`, silently exposing an untyped method that
+      // fails at runtime. Mapping keys are the operation name, except that
+      // single-record operations carry a "One" suffix on current majors
+      // (`createOne`; older majors used the plain name) and `count` has no
+      // mapping of its own — it exists whenever `aggregate` does.
       const mapping = mappingByModel.get(modelName) ?? {};
-      const hasOp = (...keys: string[]) =>
-        keys.some((key) => Boolean(mapping[key]));
+      const hasOperation = (operationName: string) => {
+        const mappingKey =
+          operationName === "count" ? "aggregate" : operationName;
+        return Boolean(mapping[mappingKey] ?? mapping[`${mappingKey}One`]);
+      };
 
-      // Operations are typed with Prisma.Args / Prisma.Result over the
-      // concrete client — the extension-author utilities that resolve for any
-      // delegate. SelectSubset keeps excess-property strictness even for
+      // Operations are typed with Prisma.Args / Prisma.Result over the caller's
+      // own client type TClient — the extension-author utilities that resolve
+      // for any delegate, so an extended client's result extensions and args
+      // flow through. SelectSubset keeps excess-property strictness even for
       // widened non-literal args (Prisma.Exact does not — pinned in
-      // tests/typelevel.test.ts). The delegate call needs the cast because
-      // with a free generic A the delegate's own generics don't bind to A —
-      // the declared Result<> return is what consumers infer from;
-      // tests/typelevel.test.ts pins those shapes and the integration tests
-      // cover runtime behavior.
+      // tests/typelevel.test.ts). The delegate call routes through the loose
+      // view (method names stay checked) and casts the arg, because with a free
+      // TClient the delegate's own generics don't bind to A — the declared
+      // Result<> return is what consumers infer from; tests/typelevel.test.ts
+      // pins those shapes and the integration tests cover runtime behavior.
       const emitOperation = (operationName: string, errorMapper: string) => `
-      ${operationName}: <A extends Prisma.Args<PrismaClient["${modelNameCamel}"], "${operationName}">>(args: Prisma.SelectSubset<A, Prisma.Args<PrismaClient["${modelNameCamel}"], "${operationName}">>) =>
+      ${operationName}: <A extends Prisma.Args<TClient["${modelNameCamel}"], "${operationName}">>(args: Prisma.SelectSubset<A, Prisma.Args<TClient["${modelNameCamel}"], "${operationName}">>) =>
         Effect.flatMap(clientOrTx(client), client =>
           Effect.tryPromise({
-            try: (): Promise<Prisma.Result<PrismaClient["${modelNameCamel}"], A, "${operationName}">> => client.${modelNameCamel}.${operationName}(args),
+            try: (): Promise<Prisma.Result<TClient["${modelNameCamel}"], A, "${operationName}">> => client.${modelNameCamel}.${operationName}(args as never),
             catch: (error) => ${errorMapper}(error, "${operationName}", "${modelName}")
           }),
         ),
 `;
 
-      // create/createMany/createManyAndReturn/upsert/updateManyAndReturn are
-      // omitted by Prisma for some models or providers (a required
-      // Unsupported() field, or a provider without the operation). Emit each
-      // only when its DMMF mapping exists — otherwise Prisma.Args would resolve
-      // to `any`, silently exposing an untyped method that fails at runtime.
-      const createOperation = hasOp("createOne", "create")
-        ? emitOperation("create", "mapCreateError")
-        : "";
-      const createManyOperation = hasOp("createMany")
-        ? emitOperation("createMany", "mapCreateError")
-        : "";
-      const createManyAndReturnOperation = hasOp("createManyAndReturn")
-        ? emitOperation("createManyAndReturn", "mapCreateError")
-        : "";
-      const upsertOperation = hasOp("upsertOne", "upsert")
-        ? emitOperation("upsert", "mapCreateError")
-        : "";
-      const updateManyAndReturnOperation = hasOp("updateManyAndReturn")
-        ? emitOperation("updateManyAndReturn", "mapUpdateManyError")
-        : "";
+      const operationDefinitions: Array<{
+        name: string;
+        errorMapper: string;
+      }> = [
+        { name: "findUnique", errorMapper: "mapFindError" },
+        { name: "findUniqueOrThrow", errorMapper: "mapFindOrThrowError" },
+        { name: "findFirst", errorMapper: "mapFindError" },
+        { name: "findFirstOrThrow", errorMapper: "mapFindOrThrowError" },
+        { name: "findMany", errorMapper: "mapFindError" },
+        { name: "create", errorMapper: "mapCreateError" },
+        { name: "createMany", errorMapper: "mapCreateError" },
+        { name: "createManyAndReturn", errorMapper: "mapCreateError" },
+        { name: "delete", errorMapper: "mapDeleteError" },
+        { name: "update", errorMapper: "mapUpdateError" },
+        { name: "deleteMany", errorMapper: "mapDeleteManyError" },
+        { name: "updateMany", errorMapper: "mapUpdateManyError" },
+        { name: "updateManyAndReturn", errorMapper: "mapUpdateManyError" },
+        { name: "upsert", errorMapper: "mapCreateError" },
+        { name: "count", errorMapper: "mapFindError" },
+        { name: "aggregate", errorMapper: "mapFindError" },
+      ];
 
-      const operations = [
-        emitOperation("findUnique", "mapFindError"),
-        emitOperation("findUniqueOrThrow", "mapFindOrThrowError"),
-        emitOperation("findFirst", "mapFindError"),
-        emitOperation("findFirstOrThrow", "mapFindOrThrowError"),
-        emitOperation("findMany", "mapFindError"),
-        createOperation,
-        createManyOperation,
-        createManyAndReturnOperation,
-        emitOperation("delete", "mapDeleteError"),
-        emitOperation("update", "mapUpdateError"),
-        emitOperation("deleteMany", "mapDeleteManyError"),
-        emitOperation("updateMany", "mapUpdateManyError"),
-        updateManyAndReturnOperation,
-        upsertOperation,
-        "\n      // Aggregation operations\n",
-        emitOperation("count", "mapFindError"),
-        emitOperation("aggregate", "mapFindError"),
-      ].join("");
+      const operations = operationDefinitions
+        .map((operation) =>
+          hasOperation(operation.name)
+            ? emitOperation(operation.name, operation.errorMapper)
+            : "",
+        )
+        .join("");
 
       return `    ${modelNameCamel}: {
 ${operations}
@@ -294,7 +290,7 @@ ${operations}
       ) =>
         Effect.flatMap(clientOrTx(client), client =>
           Effect.tryPromise({
-            try: (): Promise<Prisma.Result<PrismaClient["${modelNameCamel}"], T, "groupBy">> => client.${modelNameCamel}.groupBy(args),
+            try: (): Promise<Prisma.Result<TClient["${modelNameCamel}"], T, "groupBy">> => client.${modelNameCamel}.groupBy(args as never),
             catch: (error) => mapFindError(error, "groupBy", "${modelName}")
           }),
         ),
@@ -307,12 +303,17 @@ ${operations}
 // rest of the generated file is identical across majors.
 function variantsFor(major: EffectMajor) {
   if (major === 3) {
+    // The key is an expression so definePrismaService can pass its runtime
+    // `key` parameter; module-level tags pass their name as a string literal.
+    const tagWithRuntimeKey = (self: string, type: string, keyExpr: string) =>
+      `Context.Tag(${keyExpr})<${self}, ${type}>()`;
     return {
       imports:
         `import { Cause, Context, Data, Effect, Exit, Layer, Option, Runtime } from "effect"\n` +
         `import { Service } from "effect/Effect"`,
       tag: (self: string, type: string, id: string = self) =>
-        `Context.Tag("${id}")<\n  ${self},\n  ${type}\n>()`,
+        tagWithRuntimeKey(self, type, `"${id}"`),
+      tagWithRuntimeKey,
       serviceConstructor: `Service<PrismaService>()`,
       serviceConfigKey: "effect",
       txContextVar: "runtime",
@@ -322,10 +323,13 @@ function variantsFor(major: EffectMajor) {
       serviceStatics: "",
     };
   }
+  const tagWithRuntimeKey = (self: string, type: string, keyExpr: string) =>
+    `Context.Service<${self}, ${type}>()(${keyExpr})`;
   return {
     imports: `import { Cause, Context, Data, Effect, Exit, Layer, Option } from "effect"`,
     tag: (self: string, type: string, id: string = self) =>
-      `Context.Service<\n  ${self},\n  ${type}\n>()("${id}")`,
+      tagWithRuntimeKey(self, type, `"${id}"`),
+    tagWithRuntimeKey,
     serviceConstructor: `Context.Service<PrismaService>()`,
     serviceConfigKey: "make",
     txContextVar: "services",
@@ -756,7 +760,7 @@ type LooseDelegates = {
       }
 }
 
-const clientOrTx = (client: PrismaClient) => Effect.map(
+const clientOrTx = (client: ExtendedPrismaClientLike) => Effect.map(
   Effect.serviceOption(PrismaTransactionClientService),
   (tx) => Option.getOrElse(tx, () => client) as unknown as LooseDelegates,
 );
@@ -809,44 +813,76 @@ type GroupByInputErrors<T extends { by?: unknown; orderBy?: unknown; having?: un
   ? {}
   : GroupByOrderByErrors<T>
 
+// Builds the service operations over any client of this schema. Generic over
+// the client type, so providing an extended client (client.$extends(...))
+// yields methods whose args and results reflect the extension. The default
+// PrismaService below instantiates it at PrismaClient; extended-client users
+// instantiate it at their own \`typeof client\` (see the README).
+export const makePrismaService = <TClient extends ExtendedPrismaClientLike>(
+  client: TClient,
+) => ({
+  $transaction: <A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+    options?: {
+      maxWait?: number
+      timeout?: number
+      isolationLevel?: Prisma.TransactionIsolationLevel
+    }
+  ) =>
+    Effect.gen(function* () {
+      const ${v.txContextVar} = yield* ${v.txContextExpr};
+      const tx = yield* Effect.serviceOption(PrismaTransactionClientService);
+      return yield* Option.match(tx, {
+        onSome: (tx) => effect,
+        onNone: () =>  Effect.tryPromise({
+          try: () =>
+            client.$transaction(async (tx: Prisma.TransactionClient) => {
+              const exit = await ${v.txRun}(
+                effect.pipe(Effect.provideService(PrismaTransactionClientService, tx)) as Effect.Effect<A, E, R>,
+              )
+              if (Exit.isSuccess(exit)) {
+                return exit.value
+              }
+              throw Cause.squash(exit.cause)
+            }, options),
+          catch: (error) => error as E,
+        }) as unknown as Effect.Effect<A, E, R>,
+      })
+    }),
+  ${rawSqlOperations}
+
+  ${modelOperations}
+})
+
 export class PrismaService extends ${v.serviceConstructor}("PrismaService", {
   ${v.serviceConfigKey}: Effect.gen(function* () {
     const client = yield* PrismaClientService;
-    return {
-      $transaction: <A, E, R>(
-        effect: Effect.Effect<A, E, R>,
-        options?: {
-          maxWait?: number
-          timeout?: number
-          isolationLevel?: Prisma.TransactionIsolationLevel
-        }
-      ) =>
-        Effect.gen(function* () {
-          const ${v.txContextVar} = yield* ${v.txContextExpr};
-          const tx = yield* Effect.serviceOption(PrismaTransactionClientService);
-          return yield* Option.match(tx, {
-            onSome: (tx) => effect,
-            onNone: () =>  Effect.tryPromise({
-              try: () =>
-                client.$transaction(async (tx) => {
-                  const exit = await ${v.txRun}(
-                    effect.pipe(Effect.provideService(PrismaTransactionClientService, tx)) as Effect.Effect<A, E, R>,
-                  )
-                  if (Exit.isSuccess(exit)) {
-                    return exit.value
-                  }
-                  throw Cause.squash(exit.cause)
-                }, options),
-              catch: (error) => error as E,
-            }) as unknown as Effect.Effect<A, E, R>,
-          })
-        }),
-      ${rawSqlOperations}
-
-      ${modelOperations}
-    }
+    return makePrismaService(client);
   })
 }) {${v.serviceStatics}
+}
+
+// Defines a service tag + layer builder for a specific client type, so an
+// extended client's types flow through the service in one step:
+//
+//   const { service: Db, layer } = definePrismaService<typeof myClient>()
+//   const DbLayer = layer(myClient)
+//   // ... yield* Db  ->  operations typed against myClient (extensions included)
+//
+// \`key\` is the tag's runtime identity — tags with equal keys occupy the same
+// context slot. The default is package-namespaced so it cannot collide with
+// the built-in PrismaService or with app-level tags; pass a distinct key if an
+// app needs several client-typed services at once.
+export const definePrismaService = <TClient extends ExtendedPrismaClientLike>(
+  key: string = "effect-prisma-generator/PrismaService",
+) => {
+  type Operations = ReturnType<typeof makePrismaService<TClient>>
+  class PrismaServiceTag extends ${v.tagWithRuntimeKey("PrismaServiceTag", "Operations", "key")} {}
+  return {
+    service: PrismaServiceTag,
+    layer: (client: TClient) =>
+      Layer.succeed(PrismaServiceTag, makePrismaService(client)),
+  }
 }
 `;
 
