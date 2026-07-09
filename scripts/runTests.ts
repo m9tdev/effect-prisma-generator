@@ -72,6 +72,19 @@ const program = Effect.gen(function* () {
     "tests/prisma/generated/effect.checked.ts",
     stripped,
   );
+  // The type-level contract (tests/typelevel.test.ts) and this stripped copy
+  // are only enforced because the tests tsconfig type-checks the whole
+  // directory. If its include is ever narrowed, tsc would silently stop
+  // checking them while vitest stayed green, so guard the include here.
+  const testsTsconfig = yield* fs.readFileString("tests/tsconfig.json");
+  if (!JSON.parse(testsTsconfig).include?.includes("**/*")) {
+    return yield* Effect.fail(
+      new Error(
+        'tests/tsconfig.json must include "**/*" so typelevel.test.ts and ' +
+          "effect.checked.ts are type-checked by the tsc --noEmit step.",
+      ),
+    );
+  }
   yield* run("./tests", "tsc", "--noEmit");
   yield* run("./tests", "vitest", "run");
 }).pipe(
