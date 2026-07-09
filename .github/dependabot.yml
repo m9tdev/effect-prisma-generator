@@ -1,0 +1,17 @@
+# Development-only updates: devDependencies and pinned GitHub Actions are
+# build/test tooling that consumers never install. Runtime `dependencies` and
+# `peerDependencies` ranges are consumer-facing and managed manually, so their
+# floors are only raised deliberately.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    allow:
+      - dependency-type: "development"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
