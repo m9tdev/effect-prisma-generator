@@ -42,7 +42,7 @@
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
     "effect": "4.0.0-beta.93",
-    "eslint": "^9.39.1",
+    "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "3.7.1",
     "prisma": "^7.8.0",
