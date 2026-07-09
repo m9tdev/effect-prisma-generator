@@ -10,8 +10,15 @@ updates:
       interval: "weekly"
     allow:
       - dependency-type: "development"
+    # Only propose versions that have been public for a while, so compromised
+    # releases can be flagged and pulled before they reach this repo.
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
