@@ -240,46 +240,62 @@ function generateModelOperations(
         ),
 `;
 
-      // create/createMany/createManyAndReturn/upsert/updateManyAndReturn are
-      // omitted by Prisma for some models or providers (a required
-      // Unsupported() field, or a provider without the operation). Emit each
-      // only when its DMMF mapping exists — otherwise Prisma.Args would resolve
-      // to `any`, silently exposing an untyped method that fails at runtime.
-      const createOperation = hasOp("createOne", "create")
-        ? emitOperation("create", "mapCreateError")
-        : "";
-      const createManyOperation = hasOp("createMany")
-        ? emitOperation("createMany", "mapCreateError")
-        : "";
-      const createManyAndReturnOperation = hasOp("createManyAndReturn")
-        ? emitOperation("createManyAndReturn", "mapCreateError")
-        : "";
-      const upsertOperation = hasOp("upsertOne", "upsert")
-        ? emitOperation("upsert", "mapCreateError")
-        : "";
-      const updateManyAndReturnOperation = hasOp("updateManyAndReturn")
-        ? emitOperation("updateManyAndReturn", "mapUpdateManyError")
-        : "";
+      // `gatedOn` lists the operation's DMMF mapping keys: Prisma omits some
+      // operations for some models or providers (a required Unsupported()
+      // field, or a provider without the operation), so a gated operation is
+      // emitted only when one of its mapping keys exists — otherwise
+      // Prisma.Args would resolve to `any`, silently exposing an untyped
+      // method that fails at runtime.
+      const operationDefinitions: Array<{
+        name: string;
+        errorMapper: string;
+        gatedOn?: string[];
+      }> = [
+        { name: "findUnique", errorMapper: "mapFindError" },
+        { name: "findUniqueOrThrow", errorMapper: "mapFindOrThrowError" },
+        { name: "findFirst", errorMapper: "mapFindError" },
+        { name: "findFirstOrThrow", errorMapper: "mapFindOrThrowError" },
+        { name: "findMany", errorMapper: "mapFindError" },
+        {
+          name: "create",
+          errorMapper: "mapCreateError",
+          gatedOn: ["createOne", "create"],
+        },
+        {
+          name: "createMany",
+          errorMapper: "mapCreateError",
+          gatedOn: ["createMany"],
+        },
+        {
+          name: "createManyAndReturn",
+          errorMapper: "mapCreateError",
+          gatedOn: ["createManyAndReturn"],
+        },
+        { name: "delete", errorMapper: "mapDeleteError" },
+        { name: "update", errorMapper: "mapUpdateError" },
+        { name: "deleteMany", errorMapper: "mapDeleteManyError" },
+        { name: "updateMany", errorMapper: "mapUpdateManyError" },
+        {
+          name: "updateManyAndReturn",
+          errorMapper: "mapUpdateManyError",
+          gatedOn: ["updateManyAndReturn"],
+        },
+        {
+          name: "upsert",
+          errorMapper: "mapCreateError",
+          gatedOn: ["upsertOne", "upsert"],
+        },
+        { name: "count", errorMapper: "mapFindError" },
+        { name: "aggregate", errorMapper: "mapFindError" },
+      ];
 
-      const operations = [
-        emitOperation("findUnique", "mapFindError"),
-        emitOperation("findUniqueOrThrow", "mapFindOrThrowError"),
-        emitOperation("findFirst", "mapFindError"),
-        emitOperation("findFirstOrThrow", "mapFindOrThrowError"),
-        emitOperation("findMany", "mapFindError"),
-        createOperation,
-        createManyOperation,
-        createManyAndReturnOperation,
-        emitOperation("delete", "mapDeleteError"),
-        emitOperation("update", "mapUpdateError"),
-        emitOperation("deleteMany", "mapDeleteManyError"),
-        emitOperation("updateMany", "mapUpdateManyError"),
-        updateManyAndReturnOperation,
-        upsertOperation,
-        "\n      // Aggregation operations\n",
-        emitOperation("count", "mapFindError"),
-        emitOperation("aggregate", "mapFindError"),
-      ].join("");
+      const operations = operationDefinitions
+        .map((operation) =>
+          !operation.gatedOn || hasOp(...operation.gatedOn)
+            ? emitOperation(operation.name, operation.errorMapper)
+            : "",
+        )
+        .join("");
 
       return `    ${modelNameCamel}: {
 ${operations}
@@ -874,11 +890,12 @@ export class PrismaService extends ${v.serviceConstructor}("PrismaService", {
 //   const DbLayer = layer(myClient)
 //   // ... yield* Db  ->  operations typed against myClient (extensions included)
 //
-// \`key\` is the tag's runtime identity; it defaults to "PrismaService" (the
-// same as the built-in service above). Use one of the two, or pass a distinct
-// key if an app needs several client-typed services at once.
+// \`key\` is the tag's runtime identity — tags with equal keys occupy the same
+// context slot. The default is package-namespaced so it cannot collide with
+// the built-in PrismaService or with app-level tags; pass a distinct key if an
+// app needs several client-typed services at once.
 export const definePrismaService = <TClient extends ExtendedPrismaClientLike>(
-  key: string = "PrismaService",
+  key: string = "effect-prisma-generator/PrismaService",
 ) => {
   type Operations = ReturnType<typeof makePrismaService<TClient>>
   class PrismaServiceTag extends ${v.tagWithRuntimeKey("PrismaServiceTag", "Operations", "key")} {}
