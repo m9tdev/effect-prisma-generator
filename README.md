@@ -158,10 +158,10 @@ const program = Effect.gen(function* () {
 });
 ```
 
-The tag's runtime key defaults to `"PrismaService"` (the same as the built-in
-service) — use one of the two, or pass a distinct key
-(`definePrismaService<typeof prisma>("MyDb")`) if an app needs several
-client-typed services at once.
+The tag's runtime key defaults to `"effect-prisma-generator/PrismaService"`,
+which is distinct from the built-in service's key, so both can coexist. Pass
+your own key (`definePrismaService<typeof prisma>("MyDb")`) if an app needs
+several client-typed services at once.
 
 Under the hood this wraps `makePrismaService(client)` — also exported if you
 want to build the operations object and manage the tag yourself. Both are
