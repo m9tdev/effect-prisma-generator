@@ -17,12 +17,8 @@ const gitignorePatterns = gitignoreContent
 
 export default defineConfig(
   globalIgnores(gitignorePatterns),
-  eslintConfigPrettier,
   eslint.configs.recommended,
   tseslint.configs.strict,
-  {
-    rules: {
-      "comma-dangle": ["error", "always-multiline"],
-    },
-  },
+  // Last, so it switches off any formatting rules the presets enable.
+  eslintConfigPrettier,
 );
