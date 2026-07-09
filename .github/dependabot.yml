@@ -1,0 +1,24 @@
+# Development-only updates: devDependencies and pinned GitHub Actions are
+# build/test tooling that consumers never install. Runtime `dependencies` and
+# `peerDependencies` ranges are consumer-facing and managed manually, so their
+# floors are only raised deliberately.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    allow:
+      - dependency-type: "development"
+    # Only propose versions that have been public for a while, so compromised
+    # releases can be flagged and pulled before they reach this repo.
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
