@@ -13,9 +13,9 @@
   "scripts": {
     "build": "tsc && chmod +x dist/index.js",
     "test": "tsx scripts/runTests.ts",
-    "format": "prettier --write . && eslint . --fix",
-    "format:check": "prettier --check .",
-    "lint": "eslint .",
+    "format": "oxfmt && oxlint --fix",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint",
     "prepublishOnly": "npm run build"
   },
   "repository": {
@@ -39,16 +39,13 @@
   },
   "devDependencies": {
     "@effect/platform-node": "4.0.0-beta.93",
-    "@eslint/js": "^10.0.1",
     "@types/node": "^24.10.1",
     "effect": "4.0.0-beta.94",
-    "eslint": "^10.5.0",
-    "eslint-config-prettier": "^10.1.8",
-    "prettier": "3.9.4",
+    "oxfmt": "^0.72.0",
+    "oxlint": "^1.87.0",
     "prisma": "^7.8.0",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.62.1",
+    "typescript": "^7.0.2",
     "vitest": "^3.2.0"
   }
 }
