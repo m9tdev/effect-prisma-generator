@@ -279,9 +279,11 @@ function generateModelOperations(
       // Field references are plain values (they name a column, no query runs).
       // A getter, so building the layer reads no delegate (partial test
       // doubles stub only some models). The base client is correct inside a
-      // transaction too: a tx client's refs are equal values.
+      // transaction too: a tx client's refs are equal values. Read through
+      // PrismaClient because TClient types its models as unknown, and
+      // $extends never changes a delegate's fields.
       return `    ${modelNameCamel}: {
-      get fields(): Prisma.${modelName}FieldRefs { return client.${modelNameCamel}.fields },
+      get fields(): Prisma.${modelName}FieldRefs { return (client as unknown as PrismaClient).${modelNameCamel}.fields },
 ${operations}
       // groupBy's input validation (having/orderBy fields must appear in "by")
       // is expressed by the shared GroupBy* helpers, since Prisma.Args cannot
