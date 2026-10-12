@@ -5,6 +5,7 @@
   "compilerOptions": {
     "module": "ES2022",
     "moduleResolution": "bundler",
-    "types": ["vitest/globals"]
+    "rootDir": ".",
+    "types": ["node", "vitest/globals"]
   }
 }
