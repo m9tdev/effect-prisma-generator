@@ -280,7 +280,12 @@ function generateModelOperations(
         emitOperation("aggregate", "mapFindError"),
       ].join("");
 
+      // Field references are plain values (they name a column, no query runs).
+      // A getter, so building the layer reads no delegate (partial test
+      // doubles stub only some models). The base client is correct inside a
+      // transaction too: a tx client's refs are equal values.
       return `    ${modelNameCamel}: {
+      get fields(): Prisma.${modelName}FieldRefs { return client.${modelNameCamel}.fields },
 ${operations}
       // groupBy's input validation (having/orderBy fields must appear in "by")
       // is expressed by the shared GroupBy* helpers, since Prisma.Args cannot

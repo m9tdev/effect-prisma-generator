@@ -163,6 +163,44 @@ describe("Prisma Effect Generator", () => {
     }).pipe(Effect.provide(MainLayer)),
   );
 
+  it.effect("should filter by a field reference", () =>
+    Effect.gen(function* () {
+      const prisma = yield* PrismaService;
+      const marker = `fieldref-${Date.now()}`;
+      const selfNamed = `${marker}-self@example.com`;
+
+      yield* Effect.gen(function* () {
+        yield* prisma.user.create({
+          data: { email: selfNamed, name: selfNamed },
+        });
+        yield* prisma.user.create({
+          data: { email: `${marker}-other@example.com`, name: "someone else" },
+        });
+
+        const filter = {
+          email: { startsWith: marker },
+          name: { equals: prisma.user.fields.email },
+        };
+
+        const matches = yield* prisma.user.findMany({ where: filter });
+        expect(matches.map((user) => user.email)).toEqual([selfNamed]);
+
+        // The filter captured a base-client ref; the query below runs on the
+        // transaction client, and the ref must still match there.
+        const inTransaction = yield* prisma.$transaction(
+          prisma.user.findMany({ where: filter }),
+        );
+        expect(inTransaction.map((user) => user.email)).toEqual([selfNamed]);
+      }).pipe(
+        Effect.ensuring(
+          prisma.user
+            .deleteMany({ where: { email: { startsWith: marker } } })
+            .pipe(Effect.orDie),
+        ),
+      );
+    }).pipe(Effect.provide(MainLayer)),
+  );
+
   it.effect("should support transactions", () =>
     Effect.gen(function* () {
       const prisma = yield* PrismaService;
@@ -440,6 +478,31 @@ describe("Prisma Effect Generator", () => {
               },
             }),
           ),
+        ),
+      ),
+    ),
+  );
+
+  it.effect("should not touch delegates while building the layer", () =>
+    Effect.gen(function* () {
+      const service = yield* PrismaService;
+      const users = yield* service.user.findMany({});
+      expect(users).toEqual([{ id: 1, email: "a@b.c", name: null }]);
+    }).pipe(
+      Effect.provide(
+        Layer.provide(
+          serviceLayer,
+          // Test doubles usually stub only the models under test, so building
+          // the service must read nothing off the client — `fields` is a
+          // getter for exactly this reason.
+          layerFromPrismaClient({
+            $transaction: async () => undefined,
+            $queryRaw: async () => undefined,
+            $executeRaw: async () => undefined,
+            user: {
+              findMany: async () => [{ id: 1, email: "a@b.c", name: null }],
+            },
+          } as unknown as PrismaClient),
         ),
       ),
     ),

@@ -180,6 +180,20 @@ const program = Effect.gen(function* () {
 
 The generated `PrismaService` mirrors your Prisma Client API but returns `Effect<SpecificPrismaResultType, PrismaError, never>` instead of Promises, where `PrismaError` is a specific union type based on the operation (e.g., `PrismaCreateError`, `PrismaUpdateError`, `PrismaFindError`).
 
+### Field References
+
+Each model exposes Prisma's `fields` references, the same as a Prisma Client delegate. Use them to compare two columns of the same model in a filter:
+
+```typescript
+const selfNamedUsers = Effect.gen(function* () {
+  const prisma = yield* PrismaService;
+
+  return yield* prisma.user.findMany({
+    where: { name: { equals: prisma.user.fields.email } },
+  });
+});
+```
+
 ### Error Handling
 
 All operations return an `Effect` that can fail with specific Prisma errors. The generator maps Prisma's error codes to typed Effect errors.
