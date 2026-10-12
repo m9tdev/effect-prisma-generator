@@ -280,17 +280,12 @@ function generateModelOperations(
         emitOperation("aggregate", "mapFindError"),
       ].join("");
 
-      // Field references (client.<model>.fields) are inert markers used to
-      // compare two columns of the same model in a filter; they touch no
-      // connection, so they pass through as a plain value rather than an
-      // Effect. Reading them off the base client is correct even inside a
-      // transaction: a ref only names a column, and a transaction client's own
-      // refs are equivalent values (separate objects, same contents).
-      // A getter, not a property: a property would touch every model delegate
-      // while building the layer, which breaks partial test doubles that only
-      // stub the models they use.
+      // Field references are plain values (they name a column, no query runs).
+      // A getter, so building the layer reads no delegate (partial test
+      // doubles stub only some models). The base client is correct inside a
+      // transaction too: a tx client's refs are equal values.
       return `    ${modelNameCamel}: {
-      get fields(): typeof client.${modelNameCamel}.fields { return client.${modelNameCamel}.fields },
+      get fields(): Prisma.${modelName}FieldRefs { return client.${modelNameCamel}.fields },
 ${operations}
       // groupBy's input validation (having/orderBy fields must appear in "by")
       // is expressed by the shared GroupBy* helpers, since Prisma.Args cannot

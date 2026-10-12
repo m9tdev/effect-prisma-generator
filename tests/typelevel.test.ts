@@ -241,6 +241,10 @@ const _typeAssertions = () => {
   });
   // @ts-expect-error - String ref in an Int filter
   service.user.findMany({ where: { id: { gt: service.user.fields.email } } });
+  service.user.findMany({
+    // @ts-expect-error - a ref is bound to its model: Post ref in a User filter
+    where: { name: { equals: service.post.fields.title } },
+  });
 
   // distinct + orderBy + take don't perturb the result type
   const distinctPosts = service.post.findMany({

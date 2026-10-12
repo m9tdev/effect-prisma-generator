@@ -182,14 +182,14 @@ The generated `PrismaService` mirrors your Prisma Client API but returns `Effect
 
 ### Field References
 
-Each model exposes Prisma's `fields` markers, so a filter can compare two columns of the same model instead of dropping to `$queryRaw`:
+Each model exposes Prisma's `fields` references, the same as a Prisma Client delegate. Use them to compare two columns of the same model in a filter:
 
 ```typescript
-const staleAbsences = Effect.gen(function* () {
+const selfNamedUsers = Effect.gen(function* () {
   const prisma = yield* PrismaService;
 
-  return yield* prisma.absence.findMany({
-    where: { updatedAt: { gt: prisma.absence.fields.reconciledAt } },
+  return yield* prisma.user.findMany({
+    where: { name: { equals: prisma.user.fields.email } },
   });
 });
 ```

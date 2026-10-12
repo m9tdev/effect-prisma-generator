@@ -168,31 +168,36 @@ describe("Prisma Effect Generator", () => {
       const prisma = yield* PrismaService;
       const marker = `fieldref-${Date.now()}`;
       const selfNamed = `${marker}-self@example.com`;
-      yield* prisma.user.create({
-        data: { email: selfNamed, name: selfNamed },
-      });
-      yield* prisma.user.create({
-        data: { email: `${marker}-other@example.com`, name: "someone else" },
-      });
 
-      const filter = {
-        email: { startsWith: marker },
-        name: { equals: prisma.user.fields.email },
-      };
+      yield* Effect.gen(function* () {
+        yield* prisma.user.create({
+          data: { email: selfNamed, name: selfNamed },
+        });
+        yield* prisma.user.create({
+          data: { email: `${marker}-other@example.com`, name: "someone else" },
+        });
 
-      const matches = yield* prisma.user.findMany({ where: filter });
-      expect(matches.map((user) => user.email)).toEqual([selfNamed]);
+        const filter = {
+          email: { startsWith: marker },
+          name: { equals: prisma.user.fields.email },
+        };
 
-      // The filter captured a base-client ref; the query below runs on the
-      // transaction client, and the ref must still match there.
-      const inTransaction = yield* prisma.$transaction(
-        prisma.user.findMany({ where: filter }),
+        const matches = yield* prisma.user.findMany({ where: filter });
+        expect(matches.map((user) => user.email)).toEqual([selfNamed]);
+
+        // The filter captured a base-client ref; the query below runs on the
+        // transaction client, and the ref must still match there.
+        const inTransaction = yield* prisma.$transaction(
+          prisma.user.findMany({ where: filter }),
+        );
+        expect(inTransaction.map((user) => user.email)).toEqual([selfNamed]);
+      }).pipe(
+        Effect.ensuring(
+          prisma.user
+            .deleteMany({ where: { email: { startsWith: marker } } })
+            .pipe(Effect.orDie),
+        ),
       );
-      expect(inTransaction.map((user) => user.email)).toEqual([selfNamed]);
-
-      yield* prisma.user.deleteMany({
-        where: { email: { startsWith: marker } },
-      });
     }).pipe(Effect.provide(MainLayer)),
   );
 
