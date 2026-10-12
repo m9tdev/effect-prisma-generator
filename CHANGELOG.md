@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.11.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.10.0...v0.11.0) (2026-10-12)
+
+
+### Features
+
+* expose model field references on the service ([#61](https://github.com/m9tdev/effect-prisma-generator/issues/61)) ([5b1be5a](https://github.com/m9tdev/effect-prisma-generator/commit/5b1be5a6ce51f449e82c2eb1aa3a9d83518566c0))
+* support extended clients via layerFromPrismaClient ([a6404dd](https://github.com/m9tdev/effect-prisma-generator/commit/a6404dd2fd5c72bf797175f5ba39c2e968da40f9)), closes [#17](https://github.com/m9tdev/effect-prisma-generator/issues/17)
+* type operations with Prisma.Args/Result instead of frozen arg types ([a06e4e9](https://github.com/m9tdev/effect-prisma-generator/commit/a06e4e96af38f0c3762856c84d5d5690f2d2973a))
+
 ## [0.10.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.9.0...v0.10.0) (2026-07-08)
 
 
