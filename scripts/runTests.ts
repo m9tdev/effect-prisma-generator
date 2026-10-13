@@ -76,12 +76,25 @@ const program = Effect.gen(function* () {
   // are only enforced because the tests tsconfig type-checks the whole
   // directory. If its include is ever narrowed, tsc would silently stop
   // checking them while vitest stayed green, so guard the include here.
-  const testsTsconfig = yield* fs.readFileString("tests/tsconfig.json");
-  if (!JSON.parse(testsTsconfig).include?.includes("**/*")) {
+  const testsTsconfig = JSON.parse(
+    yield* fs.readFileString("tests/tsconfig.json"),
+  );
+  if (!testsTsconfig.include?.includes("**/*")) {
     return yield* Effect.fail(
       new Error(
         'tests/tsconfig.json must include "**/*" so typelevel.test.ts and ' +
           "effect.checked.ts are type-checked by the tsc --noEmit step.",
+      ),
+    );
+  }
+  // Users who emit declarations (libraries, composite builds) compile the
+  // generated file with `declaration`, which reports exported types that
+  // cannot be named. `tsc --noEmit` only reports those with this option on.
+  if (testsTsconfig.compilerOptions?.declaration !== true) {
+    return yield* Effect.fail(
+      new Error(
+        "tests/tsconfig.json must set declaration: true so the generated " +
+          "files are checked for declaration emit errors.",
       ),
     );
   }

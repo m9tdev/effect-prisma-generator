@@ -138,36 +138,52 @@ service.
 
 ##### Full type fidelity (`definePrismaService`)
 
-To get the extended client's **types** through the service — computed result
-fields, extension args — use `definePrismaService`, which builds a service tag
-and layer for your specific client type in one step:
+To get the extended client's **types** through the service, use
+`definePrismaService`. It builds a service tag and a layer for your client
+type:
 
 ```typescript
 import { Effect } from "effect";
 import { definePrismaService } from "~prisma/effect";
 
-const prisma = new PrismaClient().$extends(withAccelerate());
+const prisma = new PrismaClient({ adapter }).$extends({
+  result: {
+    user: {
+      upperEmail: {
+        needs: { email: true },
+        compute: (user) => user.email.toUpperCase(),
+      },
+    },
+  },
+});
 
-const { service: Prisma, layer } = definePrismaService<typeof prisma>();
-const PrismaLayer = layer(prisma);
+const { service: Db, layer } = definePrismaService("Db")<typeof prisma>();
+const DbLayer = layer(prisma);
 
 const program = Effect.gen(function* () {
-  const db = yield* Prisma;
-  // computed result fields from the extension are visible here
-  return yield* db.user.findMany({ select: { id: true } });
+  const db = yield* Db;
+  // upperEmail comes from the result extension, and it is typed
+  return yield* db.user.findMany({ select: { id: true, upperEmail: true } });
 });
 ```
 
-The tag's runtime key defaults to `"effect-prisma-generator/PrismaService"`,
-which is distinct from the built-in service's key, so both can coexist. Pass
-your own key (`definePrismaService<typeof prisma>("MyDb")`) if an app needs
-several client-typed services at once.
+- **Key:** the key (`"Db"`) is the tag's identity in the Effect context. Give
+  each service its own key. Two services with the same key use the same slot.
+- **Types that come through:** result extensions (also on relations), and the
+  client's global `omit` option.
+- **Types that do not come through:** args that a model extension adds to an
+  existing method, such as Accelerate's `cacheStrategy`. The service takes its
+  args from the client's type map, so it rejects these args. For such a query,
+  call the client directly, for example in `Effect.tryPromise`.
+- **Transactions:** a transaction belongs to the client that opened it.
+  Inside `db.$transaction(...)`, operations of services over the same client
+  object join the transaction. Operations of a service over another client run
+  outside it, with their own client's extensions. This includes the default
+  `PrismaService` over the base client, because `$extends` returns a new
+  client. So in one transaction, use services over one client.
 
-Under the hood this wraps `makePrismaService(client)` — also exported if you
-want to build the operations object and manage the tag yourself. Both are
-generic over the client type, so a plain `PrismaClient` yields exactly the base
-types (identical to the default `PrismaService`) and an extended client yields
-its extended types, transactions included.
+`makePrismaService(client)` builds the operations without a tag, if you want
+to manage the tag yourself. `PrismaServiceOf<typeof client>` is its type.
 
 `PrismaClientService` stays typed as `PrismaClient`, so lifecycle methods
 remain available through the service — `$connect()`, `$disconnect()`, and
