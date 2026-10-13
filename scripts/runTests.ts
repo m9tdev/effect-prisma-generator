@@ -1,5 +1,5 @@
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
-import { Console, Effect, FileSystem } from "effect";
+import { Console, Effect, FileSystem, Schema } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 const run = (cwd: string, cmd: string, ...args: string[]) =>
@@ -20,6 +20,16 @@ const run = (cwd: string, cmd: string, ...args: string[]) =>
     }
     return exitCode;
   });
+
+// The tests tsconfig settings that the checks below depend on.
+const TestsTsconfig = Schema.fromJsonString(
+  Schema.Struct({
+    include: Schema.optional(Schema.Array(Schema.String)),
+    compilerOptions: Schema.optional(
+      Schema.Struct({ declaration: Schema.optional(Schema.Boolean) }),
+    ),
+  }),
+);
 
 const program = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -76,7 +86,7 @@ const program = Effect.gen(function* () {
   // are only enforced because the tests tsconfig type-checks the whole
   // directory. If its include is ever narrowed, tsc would silently stop
   // checking them while vitest stayed green, so guard the include here.
-  const testsTsconfig = JSON.parse(
+  const testsTsconfig = yield* Schema.decodeUnknownEffect(TestsTsconfig)(
     yield* fs.readFileString("tests/tsconfig.json"),
   );
   if (!testsTsconfig.include?.includes("**/*")) {
