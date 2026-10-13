@@ -129,16 +129,73 @@ const PrismaLayer = Layer.provide(
 ```
 
 At runtime all operations go through the extended client and behave per the
-extension. Note that an extension's type-level changes are **not** reflected
-in the service's types:
+extension. This route keeps the default `PrismaService`, so the service's
+types stay the **base** types — an extension's type-level changes (result
+extensions' computed fields, extension-specific args like Accelerate's
+`cacheStrategy`) are not reflected. Use `layerFromPrismaClient` when you want
+the extended client's runtime behavior but don't need its types through the
+service.
 
-- Result extensions' computed fields don't appear on the service's return
-  types.
-- Extension-specific query arguments are rejected by the service's typed
-  methods — for Accelerate that means per-query caching config such as
-  `cacheStrategy` cannot be passed through the service without a cast; use
-  the extended client directly (keep your own reference to it) for those
-  queries.
+##### Your own service (`makePrismaService`)
+
+Most apps only need `PrismaService`. Make your own service only when:
+
+- an extension changes the types, such as a result extension with computed
+  fields,
+- the client has a global `omit` option, or
+- you need more than one service at the same time, such as a primary and a
+  replica.
+
+`makePrismaService(client)` builds the operations, typed against that client.
+Give it a tag and a layer, as for any Effect service:
+
+```typescript
+import { Context, Layer } from "effect";
+import { makePrismaService, type PrismaServiceOf } from "~prisma/effect";
+
+const prisma = new PrismaClient({ adapter }).$extends({
+  result: {
+    user: {
+      upperEmail: {
+        needs: { email: true },
+        compute: (user) => user.email.toUpperCase(),
+      },
+    },
+  },
+});
+
+// Effect v4. On v3: Context.Tag("Db")<Db, PrismaServiceOf<typeof prisma>>()
+class Db extends Context.Service<Db, PrismaServiceOf<typeof prisma>>()("Db") {}
+const DbLayer = Layer.succeed(Db, makePrismaService(prisma));
+
+const program = Effect.gen(function* () {
+  const db = yield* Db;
+  // upperEmail comes from the result extension, and it is typed
+  return yield* db.user.findMany({ select: { id: true, upperEmail: true } });
+});
+```
+
+- **Client from an Effect:** if an Effect creates the client, map it:
+  `Layer.effect(Db, Effect.map(makeClient, makePrismaService))` (on v3, use
+  `Layer.scoped` when `makeClient` uses `Effect.acquireRelease`).
+- **Declarations:** write the type by name, with `PrismaServiceOf<typeof
+  client>`, as above. If TypeScript infers it (for example a service class
+  with `make`, or `export const db = makePrismaService(client)`), a library
+  build writes the full operation types into each `.d.ts`.
+- **Types that come through:** result extensions (also on relations), and the
+  client's global `omit` option.
+- **Types that do not come through:** args that a model extension adds to an
+  existing method, such as Accelerate's `cacheStrategy`. The service takes its
+  args from the client's type map, so it rejects these args. For such a query,
+  call the client directly, for example in `Effect.tryPromise`.
+- **Transactions:** a transaction belongs to the client that opened it.
+  Inside `db.$transaction(...)`, operations of services over the same client
+  object join the transaction. Operations of a service over another client run
+  outside it, with their own client's extensions. This includes the default
+  `PrismaService` over the base client, because `$extends` returns a new
+  client. So in one transaction, use services over one client.
+  `PrismaTransactionClientService` is only provided inside the default
+  `PrismaService.$transaction`.
 
 `PrismaClientService` stays typed as `PrismaClient`, so lifecycle methods
 remain available through the service — `$connect()`, `$disconnect()`, and

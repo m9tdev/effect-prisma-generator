@@ -210,83 +210,76 @@ function generateModelOperations(
     .map((model) => {
       const modelName = model.name;
       const modelNameCamel = toCamelCase(modelName);
-      // A model with a required `Unsupported(...)` field (e.g. a pgvector
-      // `vector` column) cannot be created through the typed client, so Prisma
-      // omits its create/createMany/createManyAndReturn/upsert operations and
-      // their `*Args` types. Emit each operation only when its DMMF mapping
-      // exists; Prisma 7 names the single-record mappings `createOne`/
-      // `upsertOne`, older majors used `create`/`upsert`.
+      // Prisma omits an operation's DMMF mapping (and its `*Args` types) when
+      // a model or provider can't support it — e.g. no create-family
+      // operations on a model with a required `Unsupported(...)` field. Emit
+      // each operation only when its mapping exists — otherwise Prisma.Args
+      // would resolve to `any`, silently exposing an untyped method that
+      // fails at runtime. Mapping keys are the operation name, except that
+      // single-record operations carry a "One" suffix on current majors
+      // (`createOne`; older majors used the plain name) and `count` has no
+      // mapping of its own — it exists whenever `aggregate` does.
       const mapping = mappingByModel.get(modelName) ?? {};
-      const hasOp = (...keys: string[]) =>
-        keys.some((key) => Boolean(mapping[key]));
+      const hasOperation = (operationName: string) => {
+        const mappingKey =
+          operationName === "count" ? "aggregate" : operationName;
+        return Boolean(mapping[mappingKey] ?? mapping[`${mappingKey}One`]);
+      };
 
-      // Operations are typed with Prisma.Args / Prisma.Result over the
-      // concrete client — the extension-author utilities that resolve for any
-      // delegate. SelectSubset keeps excess-property strictness even for
+      // Operations are typed with Prisma.Args and OperationResult (Prisma.Result
+      // plus the client's global omit) over the caller's own client type
+      // TClient, so an extended client's result extensions flow through.
+      // Args come from the client's type map, so args that a model extension
+      // adds to an existing method (e.g. Accelerate's cacheStrategy) are not
+      // accepted. SelectSubset keeps excess-property strictness even for
       // widened non-literal args (Prisma.Exact does not — pinned in
-      // tests/typelevel.test.ts). The delegate call needs the cast because
-      // with a free generic A the delegate's own generics don't bind to A —
-      // the declared Result<> return is what consumers infer from;
-      // tests/typelevel.test.ts pins those shapes and the integration tests
-      // cover runtime behavior.
+      // tests/typelevel.test.ts). The delegate call routes through the loose
+      // view (method names stay checked) and casts the arg, because with a free
+      // TClient the delegate's own generics don't bind to A — the declared
+      // Result<> return is what consumers infer from; tests/typelevel.test.ts
+      // pins those shapes and the integration tests cover runtime behavior.
       const emitOperation = (operationName: string, errorMapper: string) => `
-      ${operationName}: <A extends Prisma.Args<PrismaClient["${modelNameCamel}"], "${operationName}">>(args: Prisma.SelectSubset<A, Prisma.Args<PrismaClient["${modelNameCamel}"], "${operationName}">>) =>
+      ${operationName}: <A extends Prisma.Args<TClient["${modelNameCamel}"], "${operationName}">>(args: Prisma.SelectSubset<A, Prisma.Args<TClient["${modelNameCamel}"], "${operationName}">>) =>
         Effect.flatMap(clientOrTx(client), client =>
           Effect.tryPromise({
-            try: (): Promise<Prisma.Result<PrismaClient["${modelNameCamel}"], A, "${operationName}">> => client.${modelNameCamel}.${operationName}(args),
+            try: (): Promise<OperationResult<TClient, TClient["${modelNameCamel}"], A, "${operationName}">> => client.${modelNameCamel}.${operationName}(args as never),
             catch: (error) => ${errorMapper}(error, "${operationName}", "${modelName}")
           }),
         ),
 `;
 
-      // create/createMany/createManyAndReturn/upsert/updateManyAndReturn are
-      // omitted by Prisma for some models or providers (a required
-      // Unsupported() field, or a provider without the operation). Emit each
-      // only when its DMMF mapping exists — otherwise Prisma.Args would resolve
-      // to `any`, silently exposing an untyped method that fails at runtime.
-      const createOperation = hasOp("createOne", "create")
-        ? emitOperation("create", "mapCreateError")
-        : "";
-      const createManyOperation = hasOp("createMany")
-        ? emitOperation("createMany", "mapCreateError")
-        : "";
-      const createManyAndReturnOperation = hasOp("createManyAndReturn")
-        ? emitOperation("createManyAndReturn", "mapCreateError")
-        : "";
-      const upsertOperation = hasOp("upsertOne", "upsert")
-        ? emitOperation("upsert", "mapCreateError")
-        : "";
-      const updateManyAndReturnOperation = hasOp("updateManyAndReturn")
-        ? emitOperation("updateManyAndReturn", "mapUpdateManyError")
-        : "";
+      const operationDefinitions: Array<{
+        name: string;
+        errorMapper: string;
+      }> = [
+        { name: "findUnique", errorMapper: "mapFindError" },
+        { name: "findUniqueOrThrow", errorMapper: "mapFindOrThrowError" },
+        { name: "findFirst", errorMapper: "mapFindError" },
+        { name: "findFirstOrThrow", errorMapper: "mapFindOrThrowError" },
+        { name: "findMany", errorMapper: "mapFindError" },
+        { name: "create", errorMapper: "mapCreateError" },
+        { name: "createMany", errorMapper: "mapCreateError" },
+        { name: "createManyAndReturn", errorMapper: "mapCreateError" },
+        { name: "delete", errorMapper: "mapDeleteError" },
+        { name: "update", errorMapper: "mapUpdateError" },
+        { name: "deleteMany", errorMapper: "mapDeleteManyError" },
+        { name: "updateMany", errorMapper: "mapUpdateManyError" },
+        { name: "updateManyAndReturn", errorMapper: "mapUpdateManyError" },
+        { name: "upsert", errorMapper: "mapCreateError" },
+        { name: "count", errorMapper: "mapFindError" },
+        { name: "aggregate", errorMapper: "mapFindError" },
+      ];
 
-      const operations = [
-        emitOperation("findUnique", "mapFindError"),
-        emitOperation("findUniqueOrThrow", "mapFindOrThrowError"),
-        emitOperation("findFirst", "mapFindError"),
-        emitOperation("findFirstOrThrow", "mapFindOrThrowError"),
-        emitOperation("findMany", "mapFindError"),
-        createOperation,
-        createManyOperation,
-        createManyAndReturnOperation,
-        emitOperation("delete", "mapDeleteError"),
-        emitOperation("update", "mapUpdateError"),
-        emitOperation("deleteMany", "mapDeleteManyError"),
-        emitOperation("updateMany", "mapUpdateManyError"),
-        updateManyAndReturnOperation,
-        upsertOperation,
-        "\n      // Aggregation operations\n",
-        emitOperation("count", "mapFindError"),
-        emitOperation("aggregate", "mapFindError"),
-      ].join("");
+      const operations = operationDefinitions
+        .map((operation) =>
+          hasOperation(operation.name)
+            ? emitOperation(operation.name, operation.errorMapper)
+            : "",
+        )
+        .join("");
 
-      // Field references are plain values (they name a column, no query runs).
-      // A getter, so building the layer reads no delegate (partial test
-      // doubles stub only some models). The base client is correct inside a
-      // transaction too: a tx client's refs are equal values.
-      return `    ${modelNameCamel}: {
-      get fields(): Prisma.${modelName}FieldRefs { return client.${modelNameCamel}.fields },
-${operations}
+      const groupByOperation = hasOperation("groupBy")
+        ? `
       // groupBy's input validation (having/orderBy fields must appear in "by")
       // is expressed by the shared GroupBy* helpers, since Prisma.Args cannot
       // capture it. Only the result type comes from Prisma.Result.
@@ -299,10 +292,21 @@ ${operations}
       ) =>
         Effect.flatMap(clientOrTx(client), client =>
           Effect.tryPromise({
-            try: (): Promise<Prisma.Result<PrismaClient["${modelNameCamel}"], T, "groupBy">> => client.${modelNameCamel}.groupBy(args),
+            try: (): Promise<Prisma.Result<TClient["${modelNameCamel}"], T, "groupBy">> => client.${modelNameCamel}.groupBy(args as never),
             catch: (error) => mapFindError(error, "groupBy", "${modelName}")
           }),
-        ),
+        ),`
+        : "";
+
+      // Field references are plain values (they name a column, no query runs).
+      // A getter, so building the layer reads no delegate (partial test
+      // doubles stub only some models). The base client is correct inside a
+      // transaction too: a tx client's refs are equal values. Read through
+      // PrismaClient because TClient types fields as unknown, and $extends
+      // never changes a delegate's fields.
+      return `    ${modelNameCamel}: {
+      get fields(): Prisma.${modelName}FieldRefs { return (client as unknown as PrismaClient).${modelNameCamel}.fields },
+${operations}${groupByOperation}
     }`;
     })
     .join(",\n\n");
@@ -354,13 +358,10 @@ async function generateUnifiedService(
   const modelOperations = generateModelOperations(models, mappings);
   const v = variantsFor(major);
 
-  const runtimeImport = hasTypedSql
-    ? `\nimport * as runtime from "@prisma/client/runtime/client"`
-    : "";
-
   const serviceContent = `${headerFor(noCheck)}
 ${v.imports}
-import { Prisma, PrismaClient } from "${clientImportPath}"${runtimeImport}
+import { Prisma, PrismaClient } from "${clientImportPath}"
+import type * as runtime from "@prisma/client/runtime/client"
 
 export class PrismaClientService extends ${v.tag("PrismaClientService", "PrismaClient")} {}
 
@@ -381,6 +382,18 @@ export type ExtendedPrismaClientLike = {
   [K in Prisma.TypeMap["meta"]["modelProps"]]: unknown
 }
 
+// A real client of this schema, plain or extended, as makePrismaService needs
+// it: every delegate must carry the type information Prisma attaches to it
+// (its \`fields\` and its symbol-keyed operation types). Without it every
+// argument would type as any, so a loosely typed value (such as an
+// ExtendedPrismaClientLike) or a hand-written mock is a compile error.
+export type PrismaClientLike = ExtendedPrismaClientLike & {
+  [K in Prisma.TypeMap["meta"]["modelProps"]]: {
+    fields: unknown
+    [key: symbol]: { types: { operations: unknown; payload: unknown } }
+  }
+}
+
 // Builds the PrismaClientService layer from a plain or extended client.
 // The cast is sound at runtime (see ExtendedPrismaClientLike above), but an
 // extension's type-level changes (e.g. result extensions adding computed
@@ -391,7 +404,14 @@ export const layerFromPrismaClient = (
   client: PrismaClient | ExtendedPrismaClientLike,
 ) => Layer.succeed(PrismaClientService, client as PrismaClient)
 
+// The transaction client of the default PrismaService, while it runs one.
 export class PrismaTransactionClientService extends ${v.tag("PrismaTransactionClientService", "Prisma.TransactionClient")} {}
+
+// The open interactive transactions, keyed by the client that opened them. An
+// operation only joins a transaction of its own client, so a transaction never
+// carries over to another client: an $extends of the same client (whose query
+// extensions would be skipped), or a client of another database.
+class PrismaTransactionClients extends ${v.tag("PrismaTransactionClients", "ReadonlyMap<object, Prisma.TransactionClient>", "effect-prisma-generator/PrismaTransactionClients")} {}
 
 export class PrismaUniqueConstraintError extends Data.TaggedError("PrismaUniqueConstraintError")<{
   cause: Prisma.PrismaClientKnownRequestError
@@ -761,10 +781,37 @@ type LooseDelegates = {
       }
 }
 
-const clientOrTx = (client: PrismaClient) => Effect.map(
-  Effect.serviceOption(PrismaTransactionClientService),
-  (tx) => Option.getOrElse(tx, () => client) as unknown as LooseDelegates,
-);
+// The global omit options of a client (new PrismaClient({ omit })). Plain and
+// extended clients both carry them in the type map of their $extends hook.
+type GlobalOmitOf<TClient> = TClient extends {
+  $extends: runtime.Types.Extensions.ExtendsHook<any, any, any, infer TypeMap>
+}
+  ? TypeMap["globalOmitOptions"]
+  : {}
+
+// Prisma.Result, plus the client's global omit options, which Prisma.Result
+// ignores: without them a globally omitted field would type as present.
+type OperationResult<TClient, Delegate, A, O extends runtime.Operation> =
+  Delegate extends { [K: symbol]: { types: { payload: any } } }
+    ? runtime.Types.Result.GetResult<Delegate[symbol]["types"]["payload"], A, O, GlobalOmitOf<TClient>>
+    : Prisma.Result<Delegate, A, O>
+
+// The transaction of \`client\` that is open in the current context, if any.
+// The default PrismaService reads PrismaTransactionClientService first, as in
+// earlier versions, so a transaction client provided inside its transaction
+// still wins.
+const openTransaction = (client: object, isDefault: boolean) =>
+  Effect.flatMap(
+    isDefault
+      ? Effect.serviceOption(PrismaTransactionClientService)
+      : Effect.succeed(Option.none<Prisma.TransactionClient>()),
+    (provided) =>
+      Option.isSome(provided)
+        ? Effect.succeed<Prisma.TransactionClient | undefined>(provided.value)
+        : Effect.map(Effect.serviceOption(PrismaTransactionClients), (open) =>
+            Option.isSome(open) ? open.value.get(client) : undefined,
+          ),
+  )
 
 // groupBy's input validation (having/orderBy fields must appear in "by")
 // cannot be expressed via Prisma.Args, so it is restated here — once, shared
@@ -814,42 +861,81 @@ type GroupByInputErrors<T extends { by?: unknown; orderBy?: unknown; having?: un
   ? {}
   : GroupByOrderByErrors<T>
 
+// Builds the service operations over a client. \`isDefault\` is only true for
+// the default PrismaService, which also provides and joins the exported
+// PrismaTransactionClientService.
+const makeService = <TClient extends PrismaClientLike>(
+  client: TClient,
+  isDefault: boolean,
+) => {
+  const clientOrTx = (client: TClient) =>
+    Effect.map(
+      openTransaction(client, isDefault),
+      (tx) => (tx ?? client) as unknown as LooseDelegates,
+    )
+
+  return {
+    $transaction: <A, E, R>(
+      effect: Effect.Effect<A, E, R>,
+      options?: {
+        maxWait?: number
+        timeout?: number
+        isolationLevel?: Prisma.TransactionIsolationLevel
+      }
+    ) =>
+      Effect.gen(function* () {
+        const ${v.txContextVar} = yield* ${v.txContextExpr};
+        // A transaction of this client is already open: join it.
+        if ((yield* openTransaction(client, isDefault)) !== undefined) {
+          return yield* effect
+        }
+        const open = yield* Effect.serviceOption(PrismaTransactionClients);
+        return yield* (Effect.tryPromise({
+          try: () =>
+            client.$transaction(async (tx: Prisma.TransactionClient) => {
+              const transactions = new Map<object, Prisma.TransactionClient>(
+                Option.isSome(open) ? open.value : undefined,
+              ).set(client, tx)
+              const inTransaction = effect.pipe(
+                Effect.provideService(PrismaTransactionClients, transactions),
+              )
+              const exit = await ${v.txRun}(
+                (isDefault
+                  ? inTransaction.pipe(Effect.provideService(PrismaTransactionClientService, tx))
+                  : inTransaction) as Effect.Effect<A, E, R>,
+              )
+              if (Exit.isSuccess(exit)) {
+                return exit.value
+              }
+              throw Cause.squash(exit.cause)
+            }, options),
+          catch: (error) => error as E,
+        }) as unknown as Effect.Effect<A, E, R>)
+      }),
+    ${rawSqlOperations}
+
+    ${modelOperations}
+  }
+}
+
+// Builds the service operations over any client of this schema. Generic over
+// the client type, so an extended client (client.$extends(...)) yields
+// operations whose results reflect the extension. A transaction belongs to the
+// client that opened it: operations of a service over another client (even an
+// $extends of the same client) run outside it.
+export const makePrismaService = <TClient extends PrismaClientLike>(
+  client: TClient,
+) => makeService(client, false)
+
+// The service operations for a client type.
+export type PrismaServiceOf<TClient extends PrismaClientLike> = ReturnType<
+  typeof makePrismaService<TClient>
+>
+
 export class PrismaService extends ${v.serviceConstructor}("PrismaService", {
   ${v.serviceConfigKey}: Effect.gen(function* () {
     const client = yield* PrismaClientService;
-    return {
-      $transaction: <A, E, R>(
-        effect: Effect.Effect<A, E, R>,
-        options?: {
-          maxWait?: number
-          timeout?: number
-          isolationLevel?: Prisma.TransactionIsolationLevel
-        }
-      ) =>
-        Effect.gen(function* () {
-          const ${v.txContextVar} = yield* ${v.txContextExpr};
-          const tx = yield* Effect.serviceOption(PrismaTransactionClientService);
-          return yield* Option.match(tx, {
-            onSome: (tx) => effect,
-            onNone: () =>  Effect.tryPromise({
-              try: () =>
-                client.$transaction(async (tx) => {
-                  const exit = await ${v.txRun}(
-                    effect.pipe(Effect.provideService(PrismaTransactionClientService, tx)) as Effect.Effect<A, E, R>,
-                  )
-                  if (Exit.isSuccess(exit)) {
-                    return exit.value
-                  }
-                  throw Cause.squash(exit.cause)
-                }, options),
-              catch: (error) => error as E,
-            }) as unknown as Effect.Effect<A, E, R>,
-          })
-        }),
-      ${rawSqlOperations}
-
-      ${modelOperations}
-    }
+    return makeService(client, true);
   })
 }) {${v.serviceStatics}
 }

@@ -6,6 +6,7 @@
     "module": "ES2022",
     "moduleResolution": "bundler",
     "rootDir": ".",
+    "declaration": true,
     "types": ["node", "vitest/globals"]
   }
 }

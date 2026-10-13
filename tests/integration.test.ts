@@ -2,9 +2,10 @@ import { describe, expect, it } from "@effect/vitest";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { Data, Effect, Layer } from "effect";
 import * as fs from "fs";
-import { PrismaClient } from "./prisma/generated/client";
+import { Prisma, PrismaClient } from "./prisma/generated/client";
 import {
   layerFromPrismaClient,
+  makePrismaService,
   PrismaClientService,
   PrismaService,
   PrismaTransactionClientService,
@@ -394,8 +395,9 @@ describe("Prisma Effect Generator", () => {
   it("should include $queryRawTyped when typedSql preview feature is enabled", () => {
     const generated = fs.readFileSync("prisma/generated/effect.ts", "utf-8");
     expect(generated).toContain("$queryRawTyped");
+    // Type-only: the generated file never loads the Prisma runtime itself.
     expect(generated).toContain(
-      'import * as runtime from "@prisma/client/runtime/client"',
+      'import type * as runtime from "@prisma/client/runtime/client"',
     );
   });
 
@@ -506,6 +508,176 @@ describe("Prisma Effect Generator", () => {
         ),
       ),
     ),
+  );
+
+  it.effect(
+    "should apply an extended client's result extension through makePrismaService, including inside a transaction",
+    () =>
+      Effect.gen(function* () {
+        const extended = prisma.$extends({
+          result: {
+            user: {
+              upperEmail: {
+                needs: { email: true },
+                compute: (user) => user.email.toUpperCase(),
+              },
+            },
+          },
+        });
+        const db = makePrismaService(extended);
+        const email = `fidelity-${Date.now()}@example.com`;
+
+        yield* db.user.create({ data: { email, name: "Fidelity" } });
+
+        // Outside a transaction: the computed field is applied at runtime and
+        // its type is present (no cast needed to read it).
+        const outside = yield* db.user.findUniqueOrThrow({
+          where: { email },
+          select: { upperEmail: true },
+        });
+        expect(outside.upperEmail).toBe(email.toUpperCase());
+
+        // Inside a transaction the extension still applies — the extended
+        // client propagates its extensions into the transaction callback, so
+        // the TClient-fidelity return type is honest inside transactions too.
+        const inside = yield* db.$transaction(
+          db.user.findUniqueOrThrow({
+            where: { email },
+            select: { upperEmail: true },
+          }),
+        );
+        expect(inside.upperEmail).toBe(email.toUpperCase());
+
+        yield* db.user.delete({ where: { email } });
+      }),
+  );
+
+  it.effect("should only join a transaction of the same client", () =>
+    Effect.gen(function* () {
+      // Fake clients: each operation reports which client ran it, so the test
+      // sees where every operation was routed.
+      const fakeClient = (name: string) => {
+        const delegates = (runner: string) => ({
+          user: { findMany: async () => runner },
+        });
+        const tx = delegates(`${name}:tx`);
+        return {
+          $transaction: async (run: (tx: unknown) => Promise<unknown>) =>
+            run(tx),
+          $queryRaw: async () => undefined,
+          $executeRaw: async () => undefined,
+          ...delegates(`${name}:base`),
+        } as unknown as PrismaClient;
+      };
+      const clientA = fakeClient("a");
+      const clientB = fakeClient("b");
+      const serviceA = makePrismaService(clientA);
+      const otherServiceA = makePrismaService(clientA);
+      const serviceB = makePrismaService(clientB);
+      const both = Effect.all([
+        otherServiceA.user.findMany({}),
+        serviceB.user.findMany({}),
+      ]);
+
+      // A service over the same client joins; one over another client does not.
+      expect(yield* serviceA.$transaction(both)).toEqual(["a:tx", "b:base"]);
+      // Nested transactions of two clients keep both open.
+      expect(yield* serviceA.$transaction(serviceB.$transaction(both))).toEqual(
+        ["a:tx", "b:tx"],
+      );
+
+      // The default PrismaService shares transactions with services over its
+      // own client, in both directions.
+      const defaultService = yield* PrismaService.pipe(
+        Effect.provide(
+          Layer.provide(serviceLayer, layerFromPrismaClient(clientA)),
+        ),
+      );
+      expect(
+        yield* defaultService.$transaction(
+          Effect.all([
+            serviceA.user.findMany({}),
+            defaultService.user.findMany({}),
+            serviceB.user.findMany({}),
+          ]),
+        ),
+      ).toEqual(["a:tx", "a:tx", "b:base"]);
+      expect(
+        yield* serviceA.$transaction(defaultService.user.findMany({})),
+      ).toBe("a:tx");
+      // A transaction client provided inside the default service's
+      // transaction wins, as in earlier versions.
+      expect(
+        yield* defaultService.$transaction(
+          defaultService.user
+            .findMany({})
+            .pipe(
+              Effect.provideService(
+                PrismaTransactionClientService,
+                fakeClient("custom") as unknown as Prisma.TransactionClient,
+              ),
+            ),
+        ),
+      ).toBe("custom:base");
+    }),
+  );
+
+  it.effect(
+    "should run a service over an extended client outside another client's transaction",
+    () =>
+      Effect.gen(function* () {
+        const prismaService = yield* PrismaService;
+        const marker = `scoped-${Date.now()}`;
+        const inScope = `${marker}-in@example.com`;
+        // Query extension: scopes every findMany to one email (like a tenant
+        // filter), plus a result extension.
+        const scopedService = makePrismaService(
+          prisma.$extends({
+            query: {
+              user: {
+                findMany: ({ args, query }) =>
+                  query({ ...args, where: { ...args.where, email: inScope } }),
+              },
+            },
+            result: {
+              user: {
+                upperEmail: {
+                  needs: { email: true },
+                  compute: (user) => user.email.toUpperCase(),
+                },
+              },
+            },
+          }),
+        );
+
+        yield* Effect.gen(function* () {
+          yield* prismaService.user.createMany({
+            data: [{ email: inScope }, { email: `${marker}-out@example.com` }],
+          });
+
+          // Inside the default service's transaction, the extended service
+          // must still apply its own extensions.
+          const [scoped, upper] = yield* prismaService.$transaction(
+            Effect.all([
+              scopedService.user.findMany({
+                where: { email: { startsWith: marker } },
+              }),
+              scopedService.user.findFirstOrThrow({
+                where: { email: inScope },
+                select: { upperEmail: true },
+              }),
+            ]),
+          );
+          expect(scoped.map((user) => user.email)).toEqual([inScope]);
+          expect(upper.upperEmail).toBe(inScope.toUpperCase());
+        }).pipe(
+          Effect.ensuring(
+            prismaService.user
+              .deleteMany({ where: { email: { startsWith: marker } } })
+              .pipe(Effect.orDie),
+          ),
+        );
+      }).pipe(Effect.provide(MainLayer)),
   );
 
   it("should reject clients missing this schema's model delegates at compile time", () => {
