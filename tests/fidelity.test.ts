@@ -67,7 +67,7 @@ const _typeAssertions = () => {
   // definePrismaService: the ergonomic front door carries the same fidelity —
   // yielding the tag gives operations typed against the client it was defined
   // for, extension fields included.
-  const { service: Db, layer } = definePrismaService("Db")<typeof extended>();
+  const { service: Db, layer } = definePrismaService<typeof extended>();
   const program = Effect.gen(function* () {
     const db = yield* Db;
     return yield* db.user.findFirst({ select: { upperEmail: true } });
@@ -76,15 +76,15 @@ const _typeAssertions = () => {
     upperEmail: string;
   } | null>();
 
-  // Each key is its own requirement: providing one defined service does not
-  // satisfy another.
-  const Other = definePrismaService("Other")<PrismaClient>();
+  // Services over different client types are distinct requirements:
+  // providing one does not satisfy the other.
+  const Other = definePrismaService<PrismaClient>("Other");
   const needsBoth = Effect.gen(function* () {
     yield* Db;
     yield* Other.service;
   }).pipe(Effect.provide(layer(extended)));
   expectTypeOf<Requirements<typeof needsBoth>>().toEqualTypeOf<
-    PrismaServiceId<"Other">
+    PrismaServiceId<PrismaClient>
   >();
 
   // Global omit options of the client apply to results, as on the client.

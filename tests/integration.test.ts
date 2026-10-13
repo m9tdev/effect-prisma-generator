@@ -679,8 +679,9 @@ describe("Prisma Effect Generator", () => {
           },
         },
       });
-      const Extended = definePrismaService("Extended")<typeof extended>();
-      const Plain = definePrismaService("Plain")<PrismaClient>();
+      // The first service uses the default key.
+      const Extended = definePrismaService<typeof extended>();
+      const Plain = definePrismaService<PrismaClient>("Plain");
       const email = `defined-${Date.now()}@example.com`;
 
       yield* Effect.gen(function* () {
@@ -705,6 +706,25 @@ describe("Prisma Effect Generator", () => {
       );
     }),
   );
+
+  it("should reject a key that is already defined, except in development", () => {
+    const key = `duplicate-${Date.now()}`;
+    definePrismaService<PrismaClient>(key);
+    // vitest runs with NODE_ENV=test, where a second definition is a mistake.
+    expect(() => definePrismaService<PrismaClient>(key)).toThrow(
+      `definePrismaService: the key "${key}" is already defined.`,
+    );
+
+    // In development a hot reload runs the definition again, so it replaces
+    // the old one.
+    const environment = process.env.NODE_ENV;
+    process.env.NODE_ENV = "development";
+    try {
+      expect(definePrismaService<PrismaClient>(key).service.key).toBe(key);
+    } finally {
+      process.env.NODE_ENV = environment;
+    }
+  });
 
   it("should reject clients missing this schema's model delegates at compile time", () => {
     const wrongShapeClient = {

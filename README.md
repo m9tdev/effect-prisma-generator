@@ -157,7 +157,7 @@ const prisma = new PrismaClient({ adapter }).$extends({
   },
 });
 
-const { service: Db, layer } = definePrismaService("Db")<typeof prisma>();
+const { service: Db, layer } = definePrismaService<typeof prisma>();
 const DbLayer = layer(prisma);
 
 const program = Effect.gen(function* () {
@@ -167,8 +167,12 @@ const program = Effect.gen(function* () {
 });
 ```
 
-- **Key:** the key (`"Db"`) is the tag's identity in the Effect context. Give
-  each service its own key. Two services with the same key use the same slot.
+- **Key:** the key is the tag's identity in the Effect context. The default is
+  `"effect-prisma-generator/PrismaService"`. If you define more than one
+  service, pass a key to each: `definePrismaService<typeof replica>("Replica")`.
+  Defining a key that is already defined throws. In development
+  (`NODE_ENV=development`) it replaces the old definition instead, so hot
+  reload works.
 - **Types that come through:** result extensions (also on relations), and the
   client's global `omit` option.
 - **Types that do not come through:** args that a model extension adds to an

@@ -945,38 +945,48 @@ export class PrismaService extends ${v.serviceConstructor}("PrismaService", {
 }) {${v.serviceStatics}
 }
 
-// The identifier of a service from definePrismaService. It carries the key, so
-// two defined services are distinct requirements in the Effect context.
-export interface PrismaServiceId<Key extends string> {
-  readonly PrismaServiceId: Key
+// The identifier of a service from definePrismaService, per client type.
+export interface PrismaServiceId<TClient extends PrismaClientLike> {
+  readonly PrismaServiceClient: TClient
 }
 
-export interface DefinedPrismaService<
-  Key extends string,
-  TClient extends PrismaClientLike,
-> {
-  readonly service: ${v.tagType("PrismaServiceId<Key>", "PrismaServiceOf<TClient>")}
-  readonly layer: (client: TClient) => Layer.Layer<PrismaServiceId<Key>>
+export interface DefinedPrismaService<TClient extends PrismaClientLike> {
+  readonly service: ${v.tagType("PrismaServiceId<TClient>", "PrismaServiceOf<TClient>")}
+  readonly layer: (client: TClient) => Layer.Layer<PrismaServiceId<TClient>>
 }
+
+// The keys defined so far.
+const definedKeys = new Set<string>()
 
 // Defines a service tag and a layer builder for a client type, so an extended
 // client's types flow through the service:
 //
-//   const { service: Db, layer } = definePrismaService("Db")<typeof myClient>()
+//   const { service: Db, layer } = definePrismaService<typeof myClient>()
 //   const DbLayer = layer(myClient)
 //   // yield* Db  ->  operations typed against myClient
 //
 // \`key\` is the tag's runtime identity: tags with the same key use the same
-// context slot, so give each service its own key.
-export const definePrismaService =
-  <Key extends string>(key: Key) =>
-  <TClient extends PrismaClientLike>(): DefinedPrismaService<Key, TClient> => {
-    const service = ${v.makeTag("PrismaServiceId<Key>", "PrismaServiceOf<TClient>", "key")}
-    return {
-      service,
-      layer: (client) => Layer.succeed(service, makePrismaService(client)),
-    }
+// context slot, so give each service its own key. Defining a key again throws,
+// except in development, where a hot reload runs a definition again and the
+// new definition replaces the old one.
+export const definePrismaService = <TClient extends PrismaClientLike>(
+  key: string = "effect-prisma-generator/PrismaService",
+): DefinedPrismaService<TClient> => {
+  const environment = (
+    globalThis as { process?: { env?: Record<string, string | undefined> } }
+  ).process?.env?.NODE_ENV
+  if (definedKeys.has(key) && environment !== "development") {
+    throw new Error(
+      \`definePrismaService: the key "\${key}" is already defined. Pass a distinct key to each service.\`,
+    )
   }
+  definedKeys.add(key)
+  const service = ${v.makeTag("PrismaServiceId<TClient>", "PrismaServiceOf<TClient>", "key")}
+  return {
+    service,
+    layer: (client) => Layer.succeed(service, makePrismaService(client)),
+  }
+}
 `;
 
   await fs.writeFile(outputPath, serviceContent);
