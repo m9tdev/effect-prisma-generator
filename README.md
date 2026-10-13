@@ -139,8 +139,7 @@ service.
 ##### Full type fidelity (`definePrismaService`)
 
 To get the extended client's **types** through the service, use
-`definePrismaService`. It builds a service tag and a layer for your client
-type:
+`definePrismaService`. It builds a service tag and a layer for your client:
 
 ```typescript
 import { Effect } from "effect";
@@ -157,8 +156,7 @@ const prisma = new PrismaClient({ adapter }).$extends({
   },
 });
 
-const { service: Db, layer } = definePrismaService<typeof prisma>();
-const DbLayer = layer(prisma);
+const { service: Db, layer: DbLayer } = definePrismaService(prisma);
 
 const program = Effect.gen(function* () {
   const db = yield* Db;
@@ -167,9 +165,21 @@ const program = Effect.gen(function* () {
 });
 ```
 
+- **Client from an Effect:** if you create the client in an Effect (for
+  example from config), pass the Effect. The layer then has the Effect's
+  errors and requirements. The layer's lifetime is the Effect's `Scope`, so
+  `Effect.acquireRelease` can disconnect the client:
+  ```typescript
+  const { service: ReadOnlyDb, layer } = definePrismaService(
+    Effect.acquireRelease(makeReadOnlyClient, (client) =>
+      Effect.promise(() => client.$disconnect()),
+    ),
+    "ReadOnlyDb",
+  );
+  ```
 - **Key:** the key is the tag's identity in the Effect context. The default is
   `"effect-prisma-generator/PrismaService"`. If you define more than one
-  service, pass a key to each: `definePrismaService<typeof replica>("Replica")`.
+  service, pass a key to each: `definePrismaService(replica, "Replica")`.
   Defining a key that is already defined throws. In development
   (`NODE_ENV=development`) it replaces the old definition instead, so hot
   reload works.

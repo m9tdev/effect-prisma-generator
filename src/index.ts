@@ -318,7 +318,7 @@ function variantsFor(major: EffectMajor) {
   if (major === 3) {
     return {
       imports:
-        `import { Cause, Context, Data, Effect, Exit, Layer, Option, Runtime } from "effect"\n` +
+        `import { Cause, Context, Data, Effect, Exit, Layer, Option, Runtime, Scope } from "effect"\n` +
         `import { Service } from "effect/Effect"`,
       tag: (self: string, type: string, id: string = self) =>
         `Context.Tag("${id}")<\n  ${self},\n  ${type}\n>()`,
@@ -326,6 +326,9 @@ function variantsFor(major: EffectMajor) {
         `Context.Tag<${identifier}, ${shape}>`,
       makeTag: (identifier: string, shape: string, keyExpr: string) =>
         `Context.GenericTag<${identifier}, ${shape}>(${keyExpr})`,
+      // A layer from an effect whose Scope is the layer's lifetime.
+      scopedLayer: (tag: string, effect: string) =>
+        `Layer.scoped(${tag}, ${effect})`,
       serviceConstructor: `Service<PrismaService>()`,
       serviceConfigKey: "effect",
       txContextVar: "runtime",
@@ -336,13 +339,16 @@ function variantsFor(major: EffectMajor) {
     };
   }
   return {
-    imports: `import { Cause, Context, Data, Effect, Exit, Layer, Option } from "effect"`,
+    imports: `import { Cause, Context, Data, Effect, Exit, Layer, Option, Scope } from "effect"`,
     tag: (self: string, type: string, id: string = self) =>
       `Context.Service<\n  ${self},\n  ${type}\n>()("${id}")`,
     tagType: (identifier: string, shape: string) =>
       `Context.Service<${identifier}, ${shape}>`,
     makeTag: (identifier: string, shape: string, keyExpr: string) =>
       `Context.Service<${identifier}, ${shape}>(${keyExpr})`,
+    // effect v4's Layer.effect already gives the effect the layer's Scope.
+    scopedLayer: (tag: string, effect: string) =>
+      `Layer.effect(${tag}, ${effect})`,
     serviceConstructor: `Context.Service<PrismaService>()`,
     serviceConfigKey: "make",
     txContextVar: "services",
@@ -950,28 +956,43 @@ export interface PrismaServiceId<TClient extends PrismaClientLike> {
   readonly PrismaServiceClient: TClient
 }
 
-export interface DefinedPrismaService<TClient extends PrismaClientLike> {
+export interface DefinedPrismaService<
+  TClient extends PrismaClientLike,
+  E = never,
+  R = never,
+> {
   readonly service: ${v.tagType("PrismaServiceId<TClient>", "PrismaServiceOf<TClient>")}
-  readonly layer: (client: TClient) => Layer.Layer<PrismaServiceId<TClient>>
+  readonly layer: Layer.Layer<PrismaServiceId<TClient>, E, R>
 }
 
 // The keys defined so far.
 const definedKeys = new Set<string>()
 
-// Defines a service tag and a layer builder for a client type, so an extended
-// client's types flow through the service:
+// Defines a service tag and its layer for a client, so the client's types
+// (including its extensions) flow through the service:
 //
-//   const { service: Db, layer } = definePrismaService<typeof myClient>()
-//   const DbLayer = layer(myClient)
+//   const { service: Db, layer: DbLayer } = definePrismaService(myClient)
 //   // yield* Db  ->  operations typed against myClient
+//
+// The client can also be an Effect that creates it. Its Scope is the layer's
+// lifetime, so an Effect.acquireRelease can disconnect the client.
 //
 // \`key\` is the tag's runtime identity: tags with the same key use the same
 // context slot, so give each service its own key. Defining a key again throws,
 // except in development, where a hot reload runs a definition again and the
 // new definition replaces the old one.
-export const definePrismaService = <TClient extends PrismaClientLike>(
+export function definePrismaService<TClient extends PrismaClientLike>(
+  client: TClient,
+  key?: string,
+): DefinedPrismaService<TClient>
+export function definePrismaService<TClient extends PrismaClientLike, E, R>(
+  client: Effect.Effect<TClient, E, R>,
+  key?: string,
+): DefinedPrismaService<TClient, E, Exclude<R, Scope.Scope>>
+export function definePrismaService<TClient extends PrismaClientLike, E, R>(
+  client: TClient | Effect.Effect<TClient, E, R>,
   key: string = "effect-prisma-generator/PrismaService",
-): DefinedPrismaService<TClient> => {
+): DefinedPrismaService<TClient, E, Exclude<R, Scope.Scope>> {
   const environment = (
     globalThis as { process?: { env?: Record<string, string | undefined> } }
   ).process?.env?.NODE_ENV
@@ -984,7 +1005,9 @@ export const definePrismaService = <TClient extends PrismaClientLike>(
   const service = ${v.makeTag("PrismaServiceId<TClient>", "PrismaServiceOf<TClient>", "key")}
   return {
     service,
-    layer: (client) => Layer.succeed(service, makePrismaService(client)),
+    layer: Effect.isEffect(client)
+      ? ${v.scopedLayer("service", "Effect.map(client, (client) => makePrismaService(client))")}
+      : Layer.succeed(service, makePrismaService(client)),
   }
 }
 `;

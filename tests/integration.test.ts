@@ -680,8 +680,8 @@ describe("Prisma Effect Generator", () => {
         },
       });
       // The first service uses the default key.
-      const Extended = definePrismaService<typeof extended>();
-      const Plain = definePrismaService<PrismaClient>("Plain");
+      const Extended = definePrismaService(extended);
+      const Plain = definePrismaService(prisma, "Plain");
       const email = `defined-${Date.now()}@example.com`;
 
       yield* Effect.gen(function* () {
@@ -699,19 +699,38 @@ describe("Prisma Effect Generator", () => {
         expect(plainRow).not.toHaveProperty("upperEmail");
 
         yield* plainService.user.delete({ where: { email } });
-      }).pipe(
-        Effect.provide(
-          Layer.mergeAll(Extended.layer(extended), Plain.layer(prisma)),
-        ),
-      );
+      }).pipe(Effect.provide(Layer.mergeAll(Extended.layer, Plain.layer)));
     }),
+  );
+
+  it.effect(
+    "should create the client of a defined service in the layer's scope",
+    () =>
+      Effect.gen(function* () {
+        let released = false;
+        const Scoped = definePrismaService(
+          Effect.acquireRelease(Effect.succeed(prisma), () =>
+            Effect.sync(() => {
+              released = true;
+            }),
+          ),
+          `scoped-${Date.now()}`,
+        );
+
+        const count = yield* Effect.gen(function* () {
+          const db = yield* Scoped.service;
+          return yield* db.user.count({});
+        }).pipe(Effect.provide(Scoped.layer));
+        expect(typeof count).toBe("number");
+        expect(released).toBe(true);
+      }),
   );
 
   it("should reject a key that is already defined, except in development", () => {
     const key = `duplicate-${Date.now()}`;
-    definePrismaService<PrismaClient>(key);
+    definePrismaService(prisma, key);
     // vitest runs with NODE_ENV=test, where a second definition is a mistake.
-    expect(() => definePrismaService<PrismaClient>(key)).toThrow(
+    expect(() => definePrismaService(prisma, key)).toThrow(
       `definePrismaService: the key "${key}" is already defined.`,
     );
 
@@ -720,7 +739,7 @@ describe("Prisma Effect Generator", () => {
     const environment = process.env.NODE_ENV;
     process.env.NODE_ENV = "development";
     try {
-      expect(definePrismaService<PrismaClient>(key).service.key).toBe(key);
+      expect(definePrismaService(prisma, key).service.key).toBe(key);
     } finally {
       process.env.NODE_ENV = environment;
     }
