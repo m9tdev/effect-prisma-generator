@@ -5,17 +5,14 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any --
    type-level assertions produce type-only values and infer through any */
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { Effect, Layer } from "effect";
+import { Effect } from "effect";
 import { Prisma, PrismaClient } from "./prisma/generated/client";
 import {
-  definePrismaService,
   type ExtendedPrismaClientLike,
   makePrismaService,
-  type PrismaServiceId,
 } from "./prisma/generated/effect";
 
 type Ok<E> = E extends Effect.Effect<infer A, any, any> ? A : never;
-type Requirements<E> = E extends Effect.Effect<any, any, infer R> ? R : never;
 
 declare const base: PrismaClient;
 
@@ -63,48 +60,6 @@ const _typeAssertions = () => {
     email: string;
     name: string | null;
   } | null>();
-
-  // definePrismaService: the ergonomic front door carries the same fidelity —
-  // yielding the tag gives operations typed against the client it was defined
-  // for, extension fields included.
-  const { service: Db, layer } = definePrismaService(extended);
-  const program = Effect.gen(function* () {
-    const db = yield* Db;
-    return yield* db.user.findFirst({ select: { upperEmail: true } });
-  }).pipe(Effect.provide(layer));
-  expectTypeOf<Ok<typeof program>>().branded.toEqualTypeOf<{
-    upperEmail: string;
-  } | null>();
-
-  // Services over different client types are distinct requirements:
-  // providing one does not satisfy the other.
-  const Other = definePrismaService(base, "Other");
-  const needsBoth = Effect.gen(function* () {
-    yield* Db;
-    yield* Other.service;
-  }).pipe(Effect.provide(layer));
-  expectTypeOf<Requirements<typeof needsBoth>>().toEqualTypeOf<
-    PrismaServiceId<PrismaClient>
-  >();
-
-  // A client created in an Effect: the layer keeps the Effect's errors and
-  // requirements, except Scope, which is the layer's lifetime.
-  class ClientError {
-    readonly _tag = "ClientError";
-  }
-  const Scoped = definePrismaService(
-    Effect.acquireRelease(
-      Effect.fail(new ClientError()) as Effect.Effect<
-        typeof extended,
-        ClientError
-      >,
-      () => Effect.void,
-    ),
-    "Scoped",
-  );
-  expectTypeOf(Scoped.layer).toEqualTypeOf<
-    Layer.Layer<PrismaServiceId<typeof extended>, ClientError, never>
-  >();
 
   // Global omit options of the client apply to results, as on the client.
   const omitting = null as unknown as PrismaClient<

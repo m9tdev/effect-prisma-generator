@@ -318,17 +318,10 @@ function variantsFor(major: EffectMajor) {
   if (major === 3) {
     return {
       imports:
-        `import { Cause, Context, Data, Effect, Exit, Layer, Option, Runtime, Scope } from "effect"\n` +
+        `import { Cause, Context, Data, Effect, Exit, Layer, Option, Runtime } from "effect"\n` +
         `import { Service } from "effect/Effect"`,
       tag: (self: string, type: string, id: string = self) =>
         `Context.Tag("${id}")<\n  ${self},\n  ${type}\n>()`,
-      tagType: (identifier: string, shape: string) =>
-        `Context.Tag<${identifier}, ${shape}>`,
-      makeTag: (identifier: string, shape: string, keyExpr: string) =>
-        `Context.GenericTag<${identifier}, ${shape}>(${keyExpr})`,
-      // A layer from an effect whose Scope is the layer's lifetime.
-      scopedLayer: (tag: string, effect: string) =>
-        `Layer.scoped(${tag}, ${effect})`,
       serviceConstructor: `Service<PrismaService>()`,
       serviceConfigKey: "effect",
       txContextVar: "runtime",
@@ -339,16 +332,9 @@ function variantsFor(major: EffectMajor) {
     };
   }
   return {
-    imports: `import { Cause, Context, Data, Effect, Exit, Layer, Option, Scope } from "effect"`,
+    imports: `import { Cause, Context, Data, Effect, Exit, Layer, Option } from "effect"`,
     tag: (self: string, type: string, id: string = self) =>
       `Context.Service<\n  ${self},\n  ${type}\n>()("${id}")`,
-    tagType: (identifier: string, shape: string) =>
-      `Context.Service<${identifier}, ${shape}>`,
-    makeTag: (identifier: string, shape: string, keyExpr: string) =>
-      `Context.Service<${identifier}, ${shape}>(${keyExpr})`,
-    // effect v4's Layer.effect already gives the effect the layer's Scope.
-    scopedLayer: (tag: string, effect: string) =>
-      `Layer.effect(${tag}, ${effect})`,
     serviceConstructor: `Context.Service<PrismaService>()`,
     serviceConfigKey: "make",
     txContextVar: "services",
@@ -811,18 +797,21 @@ type OperationResult<TClient, Delegate, A, O extends runtime.Operation> =
     : Prisma.Result<Delegate, A, O>
 
 // The transaction of \`client\` that is open in the current context, if any.
-// The default PrismaService also joins a PrismaTransactionClientService that
-// was provided directly.
+// The default PrismaService reads PrismaTransactionClientService first, as in
+// earlier versions, so a transaction client provided inside its transaction
+// still wins.
 const openTransaction = (client: object, isDefault: boolean) =>
-  Effect.flatMap(Effect.serviceOption(PrismaTransactionClients), (open) => {
-    const own = Option.isSome(open) ? open.value.get(client) : undefined
-    if (own !== undefined || !isDefault) {
-      return Effect.succeed(own)
-    }
-    return Effect.map(Effect.serviceOption(PrismaTransactionClientService), (tx) =>
-      Option.isSome(tx) ? tx.value : undefined,
-    )
-  })
+  Effect.flatMap(
+    isDefault
+      ? Effect.serviceOption(PrismaTransactionClientService)
+      : Effect.succeed(Option.none<Prisma.TransactionClient>()),
+    (provided) =>
+      Option.isSome(provided)
+        ? Effect.succeed<Prisma.TransactionClient | undefined>(provided.value)
+        : Effect.map(Effect.serviceOption(PrismaTransactionClients), (open) =>
+            Option.isSome(open) ? open.value.get(client) : undefined,
+          ),
+  )
 
 // groupBy's input validation (having/orderBy fields must appear in "by")
 // cannot be expressed via Prisma.Args, so it is restated here — once, shared
@@ -949,66 +938,6 @@ export class PrismaService extends ${v.serviceConstructor}("PrismaService", {
     return makeService(client, true);
   })
 }) {${v.serviceStatics}
-}
-
-// The identifier of a service from definePrismaService, per client type.
-export interface PrismaServiceId<TClient extends PrismaClientLike> {
-  readonly PrismaServiceClient: TClient
-}
-
-export interface DefinedPrismaService<
-  TClient extends PrismaClientLike,
-  E = never,
-  R = never,
-> {
-  readonly service: ${v.tagType("PrismaServiceId<TClient>", "PrismaServiceOf<TClient>")}
-  readonly layer: Layer.Layer<PrismaServiceId<TClient>, E, R>
-}
-
-// The keys defined so far.
-const definedKeys = new Set<string>()
-
-// Defines a service tag and its layer for a client, so the client's types
-// (including its extensions) flow through the service:
-//
-//   const { service: Db, layer: DbLayer } = definePrismaService(myClient)
-//   // yield* Db  ->  operations typed against myClient
-//
-// The client can also be an Effect that creates it. Its Scope is the layer's
-// lifetime, so an Effect.acquireRelease can disconnect the client.
-//
-// \`key\` is the tag's runtime identity: tags with the same key use the same
-// context slot, so give each service its own key. Defining a key again throws,
-// except in development, where a hot reload runs a definition again and the
-// new definition replaces the old one.
-export function definePrismaService<TClient extends PrismaClientLike>(
-  client: TClient,
-  key?: string,
-): DefinedPrismaService<TClient>
-export function definePrismaService<TClient extends PrismaClientLike, E, R>(
-  client: Effect.Effect<TClient, E, R>,
-  key?: string,
-): DefinedPrismaService<TClient, E, Exclude<R, Scope.Scope>>
-export function definePrismaService<TClient extends PrismaClientLike, E, R>(
-  client: TClient | Effect.Effect<TClient, E, R>,
-  key: string = "effect-prisma-generator/PrismaService",
-): DefinedPrismaService<TClient, E, Exclude<R, Scope.Scope>> {
-  const environment = (
-    globalThis as { process?: { env?: Record<string, string | undefined> } }
-  ).process?.env?.NODE_ENV
-  if (definedKeys.has(key) && environment !== "development") {
-    throw new Error(
-      \`definePrismaService: the key "\${key}" is already defined. Pass a distinct key to each service.\`,
-    )
-  }
-  definedKeys.add(key)
-  const service = ${v.makeTag("PrismaServiceId<TClient>", "PrismaServiceOf<TClient>", "key")}
-  return {
-    service,
-    layer: Effect.isEffect(client)
-      ? ${v.scopedLayer("service", "Effect.map(client, (client) => makePrismaService(client))")}
-      : Layer.succeed(service, makePrismaService(client)),
-  }
 }
 `;
 

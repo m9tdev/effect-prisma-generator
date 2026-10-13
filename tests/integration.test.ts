@@ -2,9 +2,8 @@ import { describe, expect, it } from "@effect/vitest";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { Data, Effect, Layer } from "effect";
 import * as fs from "fs";
-import { PrismaClient } from "./prisma/generated/client";
+import { Prisma, PrismaClient } from "./prisma/generated/client";
 import {
-  definePrismaService,
   layerFromPrismaClient,
   makePrismaService,
   PrismaClientService,
@@ -606,6 +605,20 @@ describe("Prisma Effect Generator", () => {
       expect(
         yield* serviceA.$transaction(defaultService.user.findMany({})),
       ).toBe("a:tx");
+      // A transaction client provided inside the default service's
+      // transaction wins, as in earlier versions.
+      expect(
+        yield* defaultService.$transaction(
+          defaultService.user
+            .findMany({})
+            .pipe(
+              Effect.provideService(
+                PrismaTransactionClientService,
+                fakeClient("custom") as unknown as Prisma.TransactionClient,
+              ),
+            ),
+        ),
+      ).toBe("custom:base");
     }),
   );
 
@@ -666,84 +679,6 @@ describe("Prisma Effect Generator", () => {
         );
       }).pipe(Effect.provide(MainLayer)),
   );
-
-  it.effect("should provide services from definePrismaService by key", () =>
-    Effect.gen(function* () {
-      const extended = prisma.$extends({
-        result: {
-          user: {
-            upperEmail: {
-              needs: { email: true },
-              compute: (user) => user.email.toUpperCase(),
-            },
-          },
-        },
-      });
-      // The first service uses the default key.
-      const Extended = definePrismaService(extended);
-      const Plain = definePrismaService(prisma, "Plain");
-      const email = `defined-${Date.now()}@example.com`;
-
-      yield* Effect.gen(function* () {
-        const extendedService = yield* Extended.service;
-        const plainService = yield* Plain.service;
-        yield* plainService.user.create({ data: { email } });
-
-        const withComputed = yield* extendedService.user.findUniqueOrThrow({
-          where: { email },
-        });
-        expect(withComputed.upperEmail).toBe(email.toUpperCase());
-        const plainRow = yield* plainService.user.findUniqueOrThrow({
-          where: { email },
-        });
-        expect(plainRow).not.toHaveProperty("upperEmail");
-
-        yield* plainService.user.delete({ where: { email } });
-      }).pipe(Effect.provide(Layer.mergeAll(Extended.layer, Plain.layer)));
-    }),
-  );
-
-  it.effect(
-    "should create the client of a defined service in the layer's scope",
-    () =>
-      Effect.gen(function* () {
-        let released = false;
-        const Scoped = definePrismaService(
-          Effect.acquireRelease(Effect.succeed(prisma), () =>
-            Effect.sync(() => {
-              released = true;
-            }),
-          ),
-          `scoped-${Date.now()}`,
-        );
-
-        const count = yield* Effect.gen(function* () {
-          const db = yield* Scoped.service;
-          return yield* db.user.count({});
-        }).pipe(Effect.provide(Scoped.layer));
-        expect(typeof count).toBe("number");
-        expect(released).toBe(true);
-      }),
-  );
-
-  it("should reject a key that is already defined, except in development", () => {
-    const key = `duplicate-${Date.now()}`;
-    definePrismaService(prisma, key);
-    // vitest runs with NODE_ENV=test, where a second definition is a mistake.
-    expect(() => definePrismaService(prisma, key)).toThrow(
-      `definePrismaService: the key "${key}" is already defined.`,
-    );
-
-    // In development a hot reload runs the definition again, so it replaces
-    // the old one.
-    const environment = process.env.NODE_ENV;
-    process.env.NODE_ENV = "development";
-    try {
-      expect(definePrismaService(prisma, key).service.key).toBe(key);
-    } finally {
-      process.env.NODE_ENV = environment;
-    }
-  });
 
   it("should reject clients missing this schema's model delegates at compile time", () => {
     const wrongShapeClient = {
