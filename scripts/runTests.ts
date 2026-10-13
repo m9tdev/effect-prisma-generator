@@ -1,6 +1,6 @@
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import { Console, Effect, FileSystem } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 const run = (cwd: string, cmd: string, ...args: string[]) =>
   Effect.gen(function* () {
@@ -86,7 +86,8 @@ const program = Effect.gen(function* () {
     );
   }
   yield* run("./tests", "tsc", "--noEmit");
-  yield* run("./tests", "vitest", "run");
+  // vitest comes from tests/, with the effect version under test.
+  yield* run("./tests", "npx", "--no-install", "vitest", "run");
 }).pipe(
   Effect.ensuring(
     process.argv.includes("--keep-db")

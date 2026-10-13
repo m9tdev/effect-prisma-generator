@@ -43,18 +43,16 @@ jobs:
     timeout-minutes: 10
 
     # The generator emits different code for effect v3 vs v4. Run the full
-    # integration suite against both: root deps (incl. the test harness) stay
-    # fixed, while tests/ — the code under test — installs the matrix effect.
+    # integration suite against both. tests/package.json pins the effect v4
+    # line; the v3 leg replaces effect, @effect/vitest and vitest in tests/.
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: effect-v3
-            effect: "^3.19"
-            vitest: "^0.27"
+            install: "effect@^3.19 @effect/vitest@^0.27 vitest@^3.2"
           - name: effect-v4
-            effect: "4.0.0-beta.93"
-            vitest: "4.0.0-beta.93"
+            install: ""
 
     name: test (${{ matrix.name }})
 
@@ -71,14 +69,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install test fixtures (effect ${{ matrix.effect }})
-        # The test run must use a SINGLE vitest instance: tests/ provides
-        # `@effect/vitest` + `effect` (the matrix version), but the `vitest`
-        # binary and module come from the root package (pinned to a range both
-        # @effect/vitest legs accept). --legacy-peer-deps is intentional — it
-        # stops npm from auto-installing @effect/vitest's vitest peer into
-        # tests/, which would create a second, mismatched vitest instance.
-        run: cd tests && npm install --no-save --no-package-lock --legacy-peer-deps effect@${{ matrix.effect }} @effect/vitest@${{ matrix.vitest }}
+      - name: Install test fixtures (${{ matrix.name }})
+        # effect, @effect/vitest and vitest must be one matching set, so all
+        # three live in tests/ (@effect/vitest for effect v3 needs vitest 3,
+        # for v4 vitest 5). --legacy-peer-deps keeps npm from adding peers
+        # that the fixtures do not need.
+        run: cd tests && npm install --no-save --no-package-lock --legacy-peer-deps ${{ matrix.install }}
 
       - name: Run tests
         run: npm test
