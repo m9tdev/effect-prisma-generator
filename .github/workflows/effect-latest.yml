@@ -1,7 +1,7 @@
-name: effect-beta canary
+name: effect-latest canary
 
-# Non-blocking canary: the CI matrix pins an effect v4 beta that silently ages,
-# so run the suite against the latest beta weekly to surface upstream breakage
+# Non-blocking canary: the CI matrix pins an effect v4 release that ages, so
+# run the suite against the newest release weekly to surface upstream breakage
 # before a user reports it. Failures notify but never block PRs.
 on:
   schedule:
@@ -29,13 +29,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install test fixtures (effect@beta)
-        # Same single-vitest-instance setup as the CI test matrix. The repo
+      - name: Install test fixtures (effect@latest)
+        # Same setup as the CI test matrix. The repo
         # .npmrc quarantines fresh releases; this canary exists to test them,
         # so lift the cooldown for this install only.
         env:
           NPM_CONFIG_MIN_RELEASE_AGE: "0"
-        run: cd tests && npm install --no-save --no-package-lock --legacy-peer-deps effect@beta @effect/vitest@beta
+        run: cd tests && npm install --no-save --no-package-lock --legacy-peer-deps effect@latest @effect/vitest@latest
 
       - name: Run tests
         run: npm test
