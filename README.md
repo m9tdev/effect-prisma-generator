@@ -25,14 +25,14 @@ yarn add -D effect-prisma-generator
 
 ### Effect version support
 
-The generator supports both **Effect v3** and **Effect v4 (beta)** from a single package. It detects the `effect` version installed in your project and emits matching code, so you don't need a special install:
+The generator supports **Effect v4** and **Effect v3** from a single package. It detects the `effect` version installed in your project and emits matching code, so you don't need a special install:
 
-- **Effect v3** → uses `Context.Tag` and the auto-generated `PrismaService.Default` layer.
 - **Effect v4** → uses `Context.Service` and exposes `PrismaService.layer`.
+- **Effect v3** → uses `Context.Tag` and the auto-generated `PrismaService.Default` layer.
 
-> Effect v4 is still in beta and its APIs may shift between releases, so v4 output is considered experimental.
+The examples in this README use Effect v4.
 
-If detection ever picks the wrong major (or `effect` can't be resolved — in which case it defaults to v3), set it explicitly in the generator block:
+If detection ever picks the wrong major (or `effect` can't be resolved — in which case it defaults to v4), set it explicitly in the generator block:
 
 ```prisma
 generator effect {
@@ -95,7 +95,7 @@ import { PrismaService } from "../../prisma/generated/effect";
 
 ### 1. Provide the Layer
 
-Initialize the `PrismaClient` and provide it to the generated `PrismaService` layer as a `PrismaClientService`. The layer accessor depends on your Effect version: `PrismaService.Default` on v3, `PrismaService.layer` on v4.
+Initialize the `PrismaClient` and provide it to the generated `PrismaService` layer as a `PrismaClientService`. The layer accessor depends on your Effect version: `PrismaService.layer` on v4, `PrismaService.Default` on v3.
 
 ```typescript
 import { Effect, Layer } from "effect";
@@ -104,7 +104,7 @@ import { PrismaService, PrismaClientService } from "~prisma/effect";
 // ... in your program
 const prisma = new PrismaClient({ adapter });
 const PrismaLayer = Layer.provide(
-  PrismaService.Default, // on Effect v4, use PrismaService.layer
+  PrismaService.layer, // on Effect v3, use PrismaService.Default
   Layer.succeed(PrismaClientService, prisma),
 );
 ```
@@ -123,7 +123,7 @@ import { withAccelerate } from "@prisma/extension-accelerate";
 
 const prisma = new PrismaClient().$extends(withAccelerate());
 const PrismaLayer = Layer.provide(
-  PrismaService.Default, // on Effect v4, use PrismaService.layer
+  PrismaService.layer, // on Effect v3, use PrismaService.Default
   layerFromPrismaClient(prisma),
 );
 ```
