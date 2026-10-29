@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.11.0...v0.12.0) (2026-10-29)
+
+
+### Features
+
+* default to effect v4 when the installed effect can't be detected ([#71](https://github.com/m9tdev/effect-prisma-generator/issues/71)) ([e9504a7](https://github.com/m9tdev/effect-prisma-generator/commit/e9504a74438469fa93224e18124d06abfca241dd))
+
 ## [0.11.0](https://github.com/m9tdev/effect-prisma-generator/compare/v0.10.0...v0.11.0) (2026-10-12)
 
 
