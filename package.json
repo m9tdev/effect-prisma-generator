@@ -38,7 +38,7 @@
     "prisma": "^7.0.0"
   },
   "devDependencies": {
-    "@effect/platform-node": "4.1.0",
+    "@effect/platform-node": "4.1.2",
     "@types/node": "^24.10.1",
     "effect": "4.1.0",
     "oxfmt": "^0.75.0",
